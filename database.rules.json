@@ -1,0 +1,17 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    "classList":    { ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'" },
+    "classes":      { ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'" },
+    "archives":     { ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'" },
+    "archiveIndex": { ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'" },
+    "stories": {
+      ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'",
+      "$cid": { "$gid": { ".write": "auth != null && data.exists() && newData.exists()" } }
+    },
+    "presence": {
+      ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'",
+      "$cid": { "$no": { ".write": "auth != null" } }
+    }
+  }
+}

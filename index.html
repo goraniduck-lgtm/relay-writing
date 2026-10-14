@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>릴레이 원고지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{
+  --paper:#F7F4EC;
+  --paper-deep:#EFEADD;
+  --ink:#29261F;
+  --ink-soft:#5A5648;
+  --line:#E3DDCC;
+  --rule:#B24A2E;        /* 원고지 괘선 빨강 */
+  --rule-soft:#E8C9BE;
+  --hl:#F5E7A6;          /* 내 차례 하이라이트 */
+  --ok:#3F6B4F;
+  --card:#FFFDF7;
+  --shadow:0 2px 10px rgba(41,38,31,.08);
+  --radius:14px;
+}
+*{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'IBM Plex Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-size:16px; line-height:1.55;
+  background-image:radial-gradient(rgba(178,74,46,.045) 1px, transparent 1px);
+  background-size:22px 22px;
+}
+.serif{font-family:'Gowun Batang','Apple SD Gothic Neo',serif;}
+#app{max-width:880px; margin:0 auto; padding:16px 16px 90px;}
+button{font-family:inherit; cursor:pointer; border:none; border-radius:10px; font-size:15px;}
+input,textarea,select{font-family:inherit; font-size:16px; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; background:#fff; color:var(--ink); width:100%;}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--rule); outline-offset:1px; border-color:transparent;}
+textarea{resize:vertical;}
+
+/* ---------- 공통 컴포넌트 ---------- */
+.topbar{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0 14px;}
+.brand{display:flex; align-items:baseline; gap:8px;}
+.brand h1{font-family:'Gowun Batang',serif; font-size:20px; font-weight:700; letter-spacing:-.02em;}
+.brand .tick{width:9px; height:20px; background:var(--rule); border-radius:2px; align-self:center;}
+.brand small{color:var(--ink-soft); font-size:12px;}
+.btn{background:var(--ink); color:var(--paper); padding:11px 18px; font-weight:600; transition:transform .08s ease, opacity .15s;}
+.btn:active{transform:scale(.97);}
+.btn.ghost{background:transparent; color:var(--ink); border:1.5px solid var(--ink);}
+.btn.rule{background:var(--rule); color:#fff;}
+.btn.soft{background:var(--paper-deep); color:var(--ink);}
+.btn.small{padding:7px 12px; font-size:13px; border-radius:8px;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+.card{background:var(--card); border:1.5px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);}
+.stack{display:flex; flex-direction:column; gap:14px;}
+.row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.spread{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;}
+.eyebrow{font-size:12px; font-weight:700; letter-spacing:.14em; color:var(--rule); text-transform:uppercase;}
+.muted{color:var(--ink-soft); font-size:13.5px;}
+h2.title{font-family:'Gowun Batang',serif; font-size:24px; font-weight:700; letter-spacing:-.02em;}
+h3{font-size:16px; font-weight:700;}
+.pill{display:inline-flex; align-items:center; gap:6px; background:var(--paper-deep); border-radius:999px; padding:4px 12px; font-size:13px; font-weight:500;}
+.pill .dot{width:8px; height:8px; border-radius:50%; background:#C4BFAF;}
+.pill.on .dot{background:var(--ok);}
+.pill.me{background:var(--hl);}
+.chip{display:inline-flex; align-items:center; gap:6px; border:1.5px solid var(--line); background:#fff; border-radius:999px; padding:6px 13px; font-size:14px;}
+.divider{height:1px; background:var(--line); margin:4px 0;}
+.toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:11px 20px; border-radius:999px; font-size:14px; box-shadow:0 6px 20px rgba(0,0,0,.25); z-index:99; opacity:0; transition:opacity .25s; pointer-events:none; max-width:90vw; text-align:center;}
+.toast.show{opacity:1;}
+.badge-num{display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; border-radius:50%; background:var(--rule); color:#fff; font-size:12px; font-weight:700;}
+
+/* ---------- 랜딩 ---------- */
+.landing{min-height:78vh; display:flex; flex-direction:column; justify-content:center; gap:26px;}
+.landing .hero{text-align:center;}
+.landing .hero .mark{font-family:'Gowun Batang',serif; font-size:42px; font-weight:700; line-height:1.25; letter-spacing:-.03em;}
+.landing .hero .mark em{font-style:normal; color:var(--rule); border-bottom:6px solid var(--hl);}
+.landing .hero p{margin-top:12px; color:var(--ink-soft);}
+.role-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:520px; margin:0 auto; width:100%;}
+.role-card{background:var(--card); border:1.5px solid var(--line); border-radius:var(--radius); padding:26px 18px; text-align:center; transition:transform .1s, border-color .15s;}
+.role-card:active{transform:scale(.97);}
+.role-card:hover{border-color:var(--rule);}
+.role-card .ico{font-size:34px;}
+.role-card b{display:block; margin-top:8px; font-size:17px;}
+.role-card span{font-size:12.5px; color:var(--ink-soft);}
+@media(max-width:480px){ .role-grid{grid-template-columns:1fr;} .landing .hero .mark{font-size:32px;} }
+
+/* ---------- 이름 선택 ---------- */
+.name-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px;}
+.name-btn{background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:16px 8px; font-size:16px; font-weight:600; position:relative;}
+.name-btn:hover{border-color:var(--rule);}
+.name-btn .st{display:block; font-size:11px; font-weight:400; color:var(--ink-soft); margin-top:3px;}
+.name-btn.online{border-color:var(--ok); background:#F2F7F1;}
+
+/* ---------- 원고지(이야기) ---------- */
+.manuscript{
+  background:#FFFEF9;
+  border:1.5px solid var(--rule-soft);
+  border-radius:var(--radius);
+  padding:22px 20px 22px 26px;
+  position:relative;
+  background-image:repeating-linear-gradient(transparent, transparent 35px, rgba(178,74,46,.13) 35px, rgba(178,74,46,.13) 36px);
+  background-position:0 14px;
+  box-shadow:var(--shadow);
+}
+.manuscript:before{content:''; position:absolute; top:0; bottom:0; left:14px; width:1px; background:rgba(178,74,46,.3);}
+.manuscript .sent{font-family:'Gowun Batang',serif; font-size:17.5px; line-height:36px; word-break:keep-all;}
+.manuscript .sent .seal{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-family:'IBM Plex Sans KR',sans-serif; font-size:10.5px; font-weight:700;
+  color:var(--rule); border:1px solid var(--rule); border-radius:4px;
+  padding:0 5px; height:18px; margin-right:7px; vertical-align:2px; background:#fff; letter-spacing:.02em;
+}
+.manuscript .sent.skip{color:#B7B2A2; font-size:14px;}
+.manuscript .prompt-line{font-family:'Gowun Batang',serif; font-weight:700; font-size:18.5px; line-height:36px; word-break:keep-all;}
+.manuscript .empty{color:#B7B2A2; font-family:'Gowun Batang',serif; line-height:36px;}
+
+/* ---------- 순서 트랙 ---------- */
+.order-track{display:flex; gap:8px; overflow-x:auto; padding:4px 2px 8px;}
+.order-stop{flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:64px;}
+.order-stop .face{width:46px; height:46px; border-radius:50%; background:#fff; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; position:relative;}
+.order-stop.now .face{border-color:var(--rule); background:var(--hl); box-shadow:0 0 0 4px rgba(245,231,166,.6); animation:pulse 1.6s infinite;}
+.order-stop.done-turn .face{background:var(--paper-deep); color:var(--ink-soft);}
+.order-stop .nm{font-size:12px; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.order-stop.now .nm{font-weight:700;}
+.order-stop .face .pen{position:absolute; top:-7px; right:-7px; font-size:14px;}
+.order-stop.offline .face{opacity:.45;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(245,231,166,.7);} 50%{box-shadow:0 0 0 7px rgba(245,231,166,.25);}}
+
+/* ---------- 타이머 ---------- */
+.timerbar{height:10px; background:var(--paper-deep); border-radius:999px; overflow:hidden;}
+.timerbar .fill{height:100%; background:var(--ok); border-radius:999px; transition:width 1s linear;}
+.timerbar .fill.warn{background:#C98A2D;}
+.timerbar .fill.danger{background:var(--rule);}
+.timer-num{font-variant-numeric:tabular-nums; font-weight:700; font-size:15px;}
+
+/* ---------- 내 차례 입력 ---------- */
+.myturn{border:2px solid var(--rule); background:#FFFBEF;}
+.myturn textarea{font-family:'Gowun Batang',serif; font-size:18px; min-height:96px; background:#fff;}
+.flash-turn{animation:flashbg 1s ease 2;}
+@keyframes flashbg{0%{background:var(--hl);}100%{background:transparent;}}
+
+/* ---------- 교사 대시보드 ---------- */
+.tabs{display:flex; gap:4px; background:var(--paper-deep); padding:4px; border-radius:12px; overflow-x:auto;}
+.tabs button{flex:1; background:transparent; padding:9px 10px; font-weight:600; font-size:14px; color:var(--ink-soft); border-radius:9px; white-space:nowrap;}
+.tabs button.active{background:#fff; color:var(--ink); box-shadow:var(--shadow);}
+.stu-row{display:flex; align-items:center; justify-content:space-between; padding:9px 4px; border-bottom:1px solid var(--line); gap:8px;}
+.stu-row:last-child{border-bottom:none;}
+.group-card{border:1.5px solid var(--line); border-radius:12px; background:#fff; padding:14px;}
+.group-card.writing-now{border-color:var(--rule);}
+.member-chip{display:inline-flex; align-items:center; gap:5px; background:var(--paper-deep); border-radius:8px; padding:5px 9px; font-size:13.5px; margin:3px 4px 3px 0;}
+.member-chip .x, .member-chip .mv{cursor:pointer; font-weight:700; color:var(--ink-soft); padding:0 2px;}
+.member-chip .x:hover{color:var(--rule);}
+.member-chip.turn-now{background:var(--hl); font-weight:700;}
+.prog{height:7px; background:var(--paper-deep); border-radius:99px; overflow:hidden; margin-top:8px;}
+.prog .f{height:100%; background:var(--ink); border-radius:99px;}
+.setting-row{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);}
+.setting-row:last-child{border-bottom:none;}
+.setting-row label b{display:block; font-size:15px;}
+.setting-row label span{font-size:12.5px; color:var(--ink-soft);}
+.setting-row input, .setting-row select{width:110px; text-align:center;}
+.prompt-item{display:flex; gap:8px; align-items:flex-start; padding:8px 0; border-bottom:1px dashed var(--line);}
+.prompt-item:last-child{border:none;}
+.prompt-item p{flex:1; font-family:'Gowun Batang',serif; font-size:15.5px;}
+
+/* ---------- 주제 고르기 ---------- */
+.pick-card{display:block; width:100%; text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:16px; font-family:'Gowun Batang',serif; font-size:16.5px; line-height:1.5; transition:border-color .12s, transform .08s;}
+.pick-card:hover{border-color:var(--rule);}
+.pick-card:active{transform:scale(.98);}
+
+/* ---------- 책(문집) 보기 ---------- */
+.book{background:#FFFEF9; border:1.5px solid var(--line); border-radius:4px; box-shadow:0 8px 24px rgba(41,38,31,.12); overflow:hidden;}
+.book .spine{height:10px; background:var(--rule);}
+.book .cover{padding:44px 30px; text-align:center; border-bottom:1.5px solid var(--line);}
+.book .cover .lbl{font-size:11px; letter-spacing:.3em; color:var(--rule); font-weight:700;}
+.book .cover h2{font-family:'Gowun Batang',serif; font-size:27px; font-weight:700; margin:14px 0 10px; line-height:1.4; word-break:keep-all;}
+.book .cover .authors{font-size:13.5px; color:var(--ink-soft);}
+.book .pagebody{padding:30px 28px 36px;}
+.book .pagebody .story{font-family:'Gowun Batang',serif; font-size:17.5px; line-height:2.05; word-break:keep-all; text-align:justify;}
+.book .pagebody .story .who{font-size:11px; color:var(--rule); vertical-align:6px; margin:0 2px; font-family:'IBM Plex Sans KR',sans-serif; font-weight:700;}
+.book .footerline{padding:14px; text-align:center; font-size:12px; color:var(--ink-soft); border-top:1px dashed var(--line);}
+.arch-item{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px solid var(--line);}
+.arch-item:last-child{border:none;}
+
+/* ---------- 대기 화면 ---------- */
+.waiting-hero{text-align:center; padding:40px 10px;}
+.waiting-hero .big{font-size:44px;}
+.waiting-hero h2{font-family:'Gowun Batang',serif; font-size:22px; margin-top:12px;}
+.waiting-hero p{color:var(--ink-soft); margin-top:6px; font-size:14px;}
+.dots:after{content:''; animation:dots 1.5s steps(4,end) infinite;}
+@keyframes dots{0%{content:'';}25%{content:'.';}50%{content:'..';}75%{content:'...';}}
+
+@media print{
+  body{background:#fff;}
+  #app{max-width:100%; padding:0;}
+  .no-print{display:none !important;}
+  .book{border:none; box-shadow:none;}
+}
+/* ---------- 반 / 번호 선택 ---------- */
+.class-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px;}
+.class-card{background:var(--card); border:1.5px solid var(--line); border-radius:var(--radius); padding:20px 16px; text-align:left; transition:border-color .12s, transform .08s;}
+.class-card:hover{border-color:var(--rule);}
+.class-card:active{transform:scale(.97);}
+.class-card b{display:block; font-family:'Gowun Batang',serif; font-size:20px;}
+.class-card span{font-size:12.5px; color:var(--ink-soft);}
+.num-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:10px;}
+.num-btn{background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:14px 4px 10px; text-align:center;}
+.num-btn:hover{border-color:var(--rule);}
+.num-btn .n{display:block; font-size:26px; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums;}
+.num-btn .nm{display:block; font-size:12px; color:var(--ink-soft); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.num-btn.online{border-color:var(--ok); background:#F2F7F1;}
+.num-btn.online .nm:after{content:' · 접속 중'; color:var(--ok);}
+.resume{display:flex; align-items:center; justify-content:space-between; gap:10px; max-width:520px; margin:0 auto; width:100%; background:var(--hl); border-radius:12px; padding:12px 16px;}
+.conn{font-size:12px; color:var(--ink-soft);}
+.conn.off{color:var(--rule); font-weight:700;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+<script>
+/* =====================================================
+   릴레이 원고지 — Firebase Realtime Database 버전
+   데이터 구조
+     classList/{cid}            : {name, count, createdAt}      (학생용 반 목록)
+     classes/{cid}              : 반 설정·명단·모둠·진행 단계·강퇴
+     stories/{cid}/{gid}        : 모둠별 이야기 진행 상태
+     presence/{cid}/{no}        : 접속 중인 학생 {sid, ts} (연결 끊기면 자동 삭제)
+     archiveIndex/{cid}/{aid}   : 문집 목록
+     archives/{cid}/{aid}       : 보관된 문집
+   ===================================================== */
+'use strict';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCQatrGR51jgV-QmkPr-vq1Ppj9y2NMuBo",
+  authDomain: "relay-writing-4415e.firebaseapp.com",
+  databaseURL: "https://relay-writing-4415e-default-rtdb.firebaseio.com",
+  projectId: "relay-writing-4415e",
+  storageBucket: "relay-writing-4415e.firebasestorage.app",
+  messagingSenderId: "686621546795",
+  appId: "1:686621546795:web:99d59869acd2264a42cd6e"
+};
+/* 교사 계정 — 비밀번호는 코드에 없고 Firebase 서버가 확인함 */
+const TEACHER_EMAIL = 'goraniduck@gmail.com';
+const TEACHER_UID = 'VNW0t5e67CfInsF63jATWdBsaqG2';
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+const isTeacherUser = () => !!auth.currentUser && auth.currentUser.uid === TEACHER_UID;
+/* 로그인 상태가 준비될 때까지 기다림 — 없으면 익명 로그인(학생 기기) */
+let authReady = null;
+function ensureAuth(){
+  if(auth.currentUser) return Promise.resolve(auth.currentUser);
+  if(!authReady){
+    authReady = new Promise(resolve => {
+      let off = null, done = false, trying = false;
+      const finish = u => { if(done) return; done = true; authReady = null; if(off) off(); else setTimeout(() => off && off(), 0); resolve(u); };
+      off = auth.onAuthStateChanged(async u => {
+        if(u){ finish(u); return; }
+        if(trying || done) return;
+        trying = true;
+        try{ await auth.signInAnonymously(); }
+        catch(e){ toast('접속하지 못했어요. 인터넷 연결을 확인해 주세요.'); finish(null); }
+        trying = false;
+      });
+      if(done) off();
+    });
+    const pending = authReady;
+    pending.then(() => { if(authReady === pending) authReady = null; });
+    return pending;
+  }
+  return authReady;
+}
+/* 권한 오류는 알기 쉽게 안내 */
+window.addEventListener('unhandledrejection', e => {
+  const m = String(e.reason && (e.reason.code || e.reason.message) || '');
+  if(/permission/i.test(m)) toast('권한이 없어 저장하지 못했어요');
+});
+let serverOffset = 0;
+db.ref('.info/serverTimeOffset').on('value', s => { serverOffset = s.val() || 0; });
+/* 태블릿마다 시계가 달라도 같은 기준으로 타이머가 돌도록 서버 시간 사용 */
+const now = () => Date.now() + serverOffset;
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+/* ---------- 전역 상태 ---------- */
+const S = {
+  screen: 'landing',      // landing, pinEntry, classes, teacher, classPick, numberPick, student, kicked, bookView, studentArchive
+  role: null,             // 'teacher' | 'student'
+  cid: null,              // 현재 반
+  me: null,               // 학생 번호(문자열)
+  sid: null,              // 이 기기 접속 세션 id
+  cls: null,              // classes/{cid}
+  stories: {},
+  presence: {},
+  classList: null,
+  archIdx: null,
+  teacherTab: 'live',
+  viewArch: null, viewArchFrom: null,
+  bookShowAuthors: true,
+  draft: '',
+  connected: true,
+  subs: [],
+  skipTried: {},
+  prevWriter: {},
+  flashTurn: false,
+};
+
+const $ = sel => document.querySelector(sel);
+const app = $('#app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const jsq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2400);
+}
+function fmtSec(s){ s = Math.max(0, Math.ceil(s)); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
+function fmtDate(ts){ const d = new Date(ts); return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+const lsGet = k => { try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } };
+const lsSet = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
+
+db.ref('.info/connected').on('value', s => {
+  S.connected = !!s.val();
+  const el = $('#connState'); if(el){ el.className = 'conn' + (S.connected ? '' : ' off'); el.textContent = S.connected ? '' : '⚠ 연결 끊김 · 다시 연결 중'; }
+});
+
+/* ---------- 알림음 & 진동 ---------- */
+function chime(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [[880,0],[1174.7,0.18]].forEach(([f,d]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime+d);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime+d+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+d+0.5);
+      o.start(ctx.currentTime+d); o.stop(ctx.currentTime+d+0.55);
+    });
+  }catch(e){}
+  try{ navigator.vibrate && navigator.vibrate([160,80,160]); }catch(e){}
+}
+
+/* =====================================================
+   데이터 정규화 (Firebase는 빈 배열을 저장하지 않음)
+   ===================================================== */
+function toArr(v){
+  if(!v) return [];
+  if(Array.isArray(v)) return v.filter(x => x !== null && x !== undefined);
+  return Object.keys(v).sort((a,b) => Number(a) - Number(b)).map(k => v[k]).filter(Boolean);
+}
+function normClass(v){
+  if(!v) return null;
+  return {
+    name: v.name || '이름 없는 반',
+    createdAt: v.createdAt || 0,
+    roster: toArr(v.roster).map(r => ({ no: String(r.no), name: r.name || '' })),
+    groups: toArr(v.groups).map(g => ({ id: g.id, name: g.name, members: toArr(g.members).map(String), prompt: g.prompt || 'CHOICE' })),
+    prompts: toArr(v.prompts),
+    timeLimit: v.timeLimit || 90,
+    maxSentences: v.maxSentences || 12,
+    groupSize: v.groupSize || 4,
+    minChars: v.minChars || 5,
+    phase: v.phase || 'lobby',
+    session: v.session || 0,
+    archivedSession: v.archivedSession || 0,
+    kicked: v.kicked || {},
+  };
+}
+function normStory(v){
+  if(!v) return null;
+  return {
+    prompt: v.prompt || null,
+    needChoice: !!v.needChoice,
+    turn: v.turn || 0,
+    deadline: v.deadline || null,
+    sentences: toArr(v.sentences),
+    done: !!v.done,
+    endedBy: v.endedBy || null,
+    startedAt: v.startedAt || 0,
+  };
+}
+function defaultPrompts(){
+  return [
+    {id: uid(), text: '어느 날 아침, 교실 문을 열자 책상들이 모두 사라져 있었다.'},
+    {id: uid(), text: '우리 반에 전학 온 아이는 사실 사람이 아니었다.'},
+    {id: uid(), text: '백 년 동안 잠들어 있던 도서관이 오늘 밤 깨어난다.'},
+  ];
+}
+
+/* ---------- 조회 도우미 ---------- */
+function nameOf(no){
+  const r = S.cls?.roster.find(x => x.no === String(no));
+  return r && r.name ? r.name : `${no}번`;
+}
+function fullLabel(no){
+  const r = S.cls?.roster.find(x => x.no === String(no));
+  return r && r.name ? `${no}번 ${r.name}` : `${no}번`;
+}
+function shortFace(no){ const r = S.cls?.roster.find(x => x.no === String(no)); return r && r.name ? r.name.slice(-2) : String(no); }
+function myGroup(){ return S.cls && S.me ? S.cls.groups.find(g => g.members.includes(S.me)) || null : null; }
+function groupById(gid){ return S.cls?.groups.find(g => g.id === gid) || null; }
+function isOnline(no){ return !!S.presence[no]; }
+function onlineList(){ return Object.keys(S.presence || {}); }
+function realCount(st){ return st.sentences.filter(s => !s.skip).length; }
+function currentWriter(st, g){ return g && g.members.length ? g.members[(st.turn || 0) % g.members.length] : null; }
+const classRef = (p = '') => db.ref(`classes/${S.cid}${p ? '/' + p : ''}`);
+const storyRef = gid => db.ref(`stories/${S.cid}/${gid}`);
+
+/* =====================================================
+   실시간 구독
+   ===================================================== */
+function subscribeClass(cid){
+  unsubscribeClass();
+  S.cid = cid; S.cls = null; S.stories = {}; S.presence = {}; S.prevWriter = {};
+  const subs = [
+    [db.ref('classes/' + cid), snap => { S.cls = normClass(snap.val()); onClassChange(); }],
+    [db.ref('stories/' + cid), snap => {
+      const v = snap.val() || {}; const out = {};
+      for(const k of Object.keys(v)) out[k] = normStory(v[k]);
+      S.stories = out; onStoriesChange();
+    }],
+    [db.ref('presence/' + cid), snap => { S.presence = snap.val() || {}; render(); }],
+  ];
+  subs.forEach(([r, f]) => r.on('value', f));
+  S.subs = subs;
+}
+function unsubscribeClass(){
+  S.subs.forEach(([r, f]) => r.off('value', f));
+  S.subs = [];
+}
+
+function onClassChange(){
+  if(S.role === 'student'){
+    if(!S.cls){ leaveStudent(); toast('반이 삭제되었어요'); return; }
+    if(S.me && S.cls.kicked[S.me] && S.cls.kicked[S.me] === S.sid){
+      stopPresence(); S.screen = 'kicked'; render(); return;
+    }
+    if(S.me && !S.cls.roster.some(r => r.no === S.me)){
+      stopPresence(); S.me = null; S.screen = 'numberPick'; render();
+      toast('명단이 바뀌었어요. 번호를 다시 골라 주세요.'); return;
+    }
+  }
+  if(S.role === 'teacher' && !S.cls && S.screen === 'teacher'){
+    S.screen = 'classes'; loadClassList(); return;
+  }
+  render();
+}
+
+function onStoriesChange(){
+  if(S.role === 'student' && S.me && S.cls){
+    const g = myGroup();
+    const st = g && S.stories[g.id];
+    if(st && g){
+      const w = (st.done || st.needChoice) ? null : currentWriter(st, g);
+      if(w === S.me && S.prevWriter[g.id] !== S.me){ S.flashTurn = true; chime(); }
+      S.prevWriter[g.id] = w;
+    }
+  }
+  render();
+}
+
+/* ---------- 접속 표시 (presence) ---------- */
+let presenceRef = null, connHandler = null;
+function startPresence(){
+  stopPresence();
+  presenceRef = db.ref(`presence/${S.cid}/${S.me}`);
+  const myRef = presenceRef, mySid = S.sid;
+  connHandler = s => {
+    if(!s.val() || presenceRef !== myRef) return;
+    myRef.onDisconnect().remove().then(() => myRef.set({ sid: mySid, ts: firebase.database.ServerValue.TIMESTAMP }));
+  };
+  db.ref('.info/connected').on('value', connHandler);
+}
+function stopPresence(){
+  if(connHandler) db.ref('.info/connected').off('value', connHandler);
+  connHandler = null;
+  if(presenceRef){
+    const r = presenceRef; presenceRef = null;
+    r.onDisconnect().cancel();
+    r.once('value').then(s => { if(s.val() && s.val().sid === S.sid) r.remove(); });
+  }
+}
+
+/* ---------- 1초 타이머: 화면 숫자 갱신 + 시간초과 자동 넘김 ---------- */
+setInterval(() => {
+  renderTickOnly();
+  maybeAutoSkip();
+}, 1000);
+
+function maybeAutoSkip(){
+  if(!S.cls || S.cls.phase !== 'writing') return;
+  const groups = S.role === 'teacher' ? S.cls.groups : (myGroup() ? [myGroup()] : []);
+  for(const g of groups){
+    const st = S.stories[g.id];
+    if(!st || st.done || st.needChoice || !st.deadline || !g.members.length) continue;
+    const over = now() - st.deadline;
+    if(over <= 0) continue;
+    const writer = currentWriter(st, g);
+    const next = g.members[((st.turn || 0) + 1) % g.members.length];
+    let grace = Infinity;
+    if(S.role === 'student' && writer === S.me) grace = 1200;
+    else if(S.role === 'teacher') grace = 2500;
+    else if(S.role === 'student' && next === S.me) grace = 4000;
+    if(over < grace) continue;
+    const key = g.id + ':' + st.turn + ':' + st.deadline;
+    if(S.skipTried[key] && now() - S.skipTried[key] < 5000) continue;
+    S.skipTried[key] = now();
+    const expectTurn = st.turn;
+    storyRef(g.id).transaction(cur => {
+      if(!cur) return cur;
+      const s = normStory(cur);
+      const gg = groupById(g.id);
+      if(!gg || !gg.members.length) return;
+      if(s.done || s.needChoice || s.turn !== expectTurn || !s.deadline || now() - s.deadline < grace - 400) return;
+      s.sentences.push({ a: currentWriter(s, gg), t: '', skip: true, ts: now() });
+      s.turn = (s.turn + 1) % gg.members.length;
+      s.deadline = now() + S.cls.timeLimit * 1000;
+      return s;
+    });
+  }
+}
+
+function renderTickOnly(){
+  document.querySelectorAll('[data-deadline]').forEach(el => {
+    const dl = Number(el.dataset.deadline);
+    const total = Number(el.dataset.total) || 90;
+    const remain = Math.max(0, (dl - now()) / 1000);
+    const numEl = el.querySelector('.timer-num');
+    if(numEl) numEl.textContent = fmtSec(remain);
+    const fill = el.querySelector('.fill');
+    if(fill){
+      const pct = Math.max(0, Math.min(100, remain / total * 100));
+      fill.style.width = pct + '%';
+      fill.className = 'fill' + (pct < 20 ? ' danger' : pct < 45 ? ' warn' : '');
+    }
+  });
+}
+
+/* =====================================================
+   렌더 라우터 (입력 중엔 다시 그리지 않아 한글 입력이 끊기지 않음)
+   ===================================================== */
+function render(){
+  const ae = document.activeElement;
+  if(ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.tagName === 'SELECT') && app.contains(ae)
+     && (S.screen === 'teacher' || S.screen === 'student' || S.screen === 'classes')){
+    if(S.screen === 'student' && ae.id === 'sentInput'){
+      const g = myGroup(); const st = g && S.stories[g.id];
+      if(!g || !st || st.done || st.needChoice || currentWriter(st, g) !== S.me || S.cls.phase !== 'writing'){
+        S.draft = ''; ae.blur(); doRender(); return;
+      }
+      const tz = document.getElementById('tickzone');
+      if(tz) tz.dataset.deadline = st.deadline;
+      const cnt = document.getElementById('sentCount');
+      if(cnt) cnt.textContent = `📜 ${realCount(st)} / ${S.cls.maxSentences}문장`;
+    }
+    return;
+  }
+  doRender();
+}
+function doRender(){
+  switch(S.screen){
+    case 'landing':        renderLanding(); break;
+    case 'pinEntry':       renderPin(); break;
+    case 'classes':        renderClasses(); break;
+    case 'teacher':        renderTeacher(); break;
+    case 'classPick':      renderClassPick(); break;
+    case 'numberPick':     renderNumberPick(); break;
+    case 'student':        renderStudent(); break;
+    case 'kicked':         renderKicked(); break;
+    case 'bookView':       renderBookView(); break;
+    case 'studentArchive': renderStudentArchive(); break;
+  }
+}
+const loadingHtml = (msg = '불러오는 중') => `<div class="waiting-hero"><div class="big">📖</div><h2>${msg}<span class="dots"></span></h2></div>`;
+
+function topbar(rightHtml){
+  return `<div class="topbar no-print">
+    <div class="brand"><span class="tick"></span><h1>릴레이 원고지</h1>${S.cls && S.cid && S.screen !== 'classes' && S.screen !== 'classPick' ? `<small>${esc(S.cls.name)}</small>` : '<small>함께 쓰는 이야기</small>'}</div>
+    <div class="row"><span id="connState" class="conn${S.connected ? '' : ' off'}">${S.connected ? '' : '⚠ 연결 끊김 · 다시 연결 중'}</span>${rightHtml || ''}</div>
+  </div>`;
+}
+
+/* =====================================================
+   첫 화면
+   ===================================================== */
+function renderLanding(){
+  const last = lsGet('relay.last');
+  app.innerHTML = `
+  <div class="landing">
+    <div class="hero">
+      <div class="mark">한 문장씩,<br><em>우리 반의 이야기</em>가 됩니다</div>
+      <p>선생님이 모둠을 정하고, 친구들이 차례로 이어 씁니다.</p>
+    </div>
+    ${last ? `<div class="resume"><span>지난번 <b>${esc(last.cname)} ${esc(last.no)}번</b>으로 참여했어요</span>
+      <button class="btn small" onclick="resumeLast()">이어서 하기</button></div>` : ''}
+    <div class="role-grid">
+      <button class="role-card" onclick="goStudent()">
+        <div class="ico">✏️</div><b>학생으로 참여</b><span>반과 내 번호를 고르고 시작해요</span>
+      </button>
+      <button class="role-card" onclick="goTeacher()">
+        <div class="ico">🗝️</div><b>교사 모드</b><span>반 관리 · 모둠 배정 · 진행</span>
+      </button>
+    </div>
+  </div>`;
+}
+function backToLanding(){
+  stopPresence(); unsubscribeClass();
+  S.role = null; S.me = null; S.cid = null; S.cls = null; S.screen = 'landing'; render();
+}
+
+/* =====================================================
+   학생 입장: 반 선택 → 번호 선택
+   ===================================================== */
+async function loadClassList(){
+  const snap = await db.ref('classList').once('value');
+  const v = snap.val() || {};
+  S.classList = Object.entries(v).map(([id, c]) => ({ id, ...c })).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko', {numeric: true}));
+  render();
+}
+async function goStudent(){
+  await ensureAuth();
+  stopPresence(); unsubscribeClass();
+  S.role = 'student'; S.cid = null; S.cls = null; S.me = null;
+  S.classList = null; S.screen = 'classPick'; render(); loadClassList();
+}
+function renderClassPick(){
+  const head = topbar(`<button class="btn small ghost" onclick="backToLanding()">← 처음으로</button>`);
+  if(!S.classList){ app.innerHTML = head + loadingHtml(); return; }
+  if(!S.classList.length){
+    app.innerHTML = head + `<div class="waiting-hero"><div class="big">🪑</div>
+      <h2>아직 열린 반이 없어요</h2><p>선생님이 반을 만들면 여기에 나타나요.</p>
+      <div style="margin-top:18px"><button class="btn soft" onclick="loadClassList()">새로고침</button></div></div>`;
+    return;
+  }
+  app.innerHTML = head + `<div class="stack">
+    <div><span class="eyebrow">Step 1</span><h2 class="title">우리 반을 골라 주세요</h2></div>
+    <div class="class-grid">${S.classList.map(c => `
+      <button class="class-card" onclick="pickClass('${jsq(c.id)}')"><b>${esc(c.name)}</b><span>${c.count || 0}명</span></button>`).join('')}
+    </div></div>`;
+}
+function pickClass(cid){
+  subscribeClass(cid);
+  S.screen = 'numberPick'; render();
+}
+function renderNumberPick(){
+  const head = topbar(`<button class="btn small ghost" onclick="goStudent()">← 반 다시 고르기</button>`);
+  if(!S.cls){ app.innerHTML = head + loadingHtml(); return; }
+  app.innerHTML = head + `<div class="stack">
+    <div class="spread">
+      <div><span class="eyebrow">Step 2 · ${esc(S.cls.name)}</span><h2 class="title">내 번호를 골라 주세요</h2>
+      <p class="muted">다시 들어온 경우에도 내 번호를 누르면 이어서 할 수 있어요.</p></div>
+      <button class="btn small soft" onclick="openStudentArchive()">📚 우리 반 문집</button>
+    </div>
+    <div class="num-grid">${S.cls.roster.map(r => `
+      <button class="num-btn ${isOnline(r.no) ? 'online' : ''}" onclick="pickNumber('${jsq(r.no)}')">
+        <span class="n">${esc(r.no)}</span><span class="nm">${esc(r.name || ' ')}</span>
+      </button>`).join('')}
+    </div></div>`;
+}
+function pickNumber(no){
+  if(isOnline(no) && !confirm(`${fullLabel(no)}은(는) 이미 다른 기기에서 접속 중이에요.\n이 기기로 이어서 할까요?`)) return;
+  S.me = String(no);
+  S.sid = uid() + uid();
+  lsSet('relay.last', { cid: S.cid, cname: S.cls.name, no: S.me });
+  startPresence();
+  S.screen = 'student'; S.prevWriter = {}; render();
+  toast(`${fullLabel(no)}, 환영해요!`);
+}
+async function resumeLast(){
+  const last = lsGet('relay.last'); if(!last) return;
+  await ensureAuth();
+  S.role = 'student';
+  app.innerHTML = loadingHtml('다시 연결하는 중');
+  const snap = await db.ref('classes/' + last.cid).once('value');
+  const c = normClass(snap.val());
+  if(!c || !c.roster.some(r => r.no === String(last.no))){
+    localStorage.removeItem('relay.last'); toast('지난 반 정보를 찾을 수 없어요'); goStudent(); return;
+  }
+  subscribeClass(last.cid);
+  S.cls = c;
+  S.me = String(last.no); S.sid = uid() + uid();
+  startPresence();
+  S.screen = 'student'; render();
+}
+function leaveStudent(){
+  stopPresence();
+  goStudent();
+}
+function renderKicked(){
+  app.innerHTML = topbar() + `<div class="waiting-hero">
+    <div class="big">🚪</div><h2>선생님이 연결을 해제했어요</h2>
+    <p>필요하면 선생님께 말씀드리고 다시 입장하세요.</p>
+    <div style="margin-top:18px"><button class="btn" onclick="goStudent()">다시 입장하기</button></div>
+  </div>`;
+}
+
+/* =====================================================
+   학생 화면
+   ===================================================== */
+function renderStudent(){
+  const head = topbar(`
+    <span class="pill me"><span class="dot" style="background:var(--ok)"></span>${esc(S.me ? fullLabel(S.me) : '')}</span>
+    <button class="btn small ghost" onclick="if(confirm('나갈까요? 내 번호를 다시 누르면 이어서 할 수 있어요.'))leaveStudent()">나가기</button>`);
+  if(!S.cls){ app.innerHTML = head + loadingHtml('연결 중'); return; }
+  const g = myGroup();
+
+  if(!g){
+    app.innerHTML = head + `<div class="waiting-hero"><div class="big">🧩</div>
+      <h2>모둠 배정을 기다리고 있어요<span class="dots"></span></h2>
+      <p>선생님이 곧 모둠을 정해 줄 거예요.</p></div>` + lobbyPeers();
+    return;
+  }
+  const st = S.stories[g.id];
+  if(S.cls.phase !== 'writing' && !(st && st.done)){
+    app.innerHTML = head + `
+      <div class="card stack">
+        <div class="spread"><h2 class="title">${esc(g.name)}</h2><span class="pill">시작 대기 중</span></div>
+        <div>${g.members.map((m, i) => `<span class="member-chip ${m === S.me ? 'turn-now' : ''}"><span class="badge-num" style="background:var(--ink)">${i+1}</span> ${isOnline(m) ? '🟢' : '⚪'} ${esc(fullLabel(m))}</span>`).join('')}</div>
+        <p class="muted">선생님이 시작하면 글쓰기가 시작돼요. 쓰는 순서는 위 번호 순서예요.</p>
+      </div>` + lobbyPeers();
+    return;
+  }
+  if(!st){ app.innerHTML = head + loadingHtml('이야기를 불러오는 중'); return; }
+
+  if(st.done){
+    app.innerHTML = head + `
+      <div class="waiting-hero" style="padding:20px 0 10px">
+        <div class="big">🎉</div><h2>이야기가 완성되었어요!</h2><p>우리 모둠의 책을 함께 읽어 보세요.</p>
+      </div>
+      ${bookHtml(liveStoryForBook(st, g))}
+      <div class="row no-print" style="justify-content:center;margin-top:14px">
+        <button class="btn soft" onclick="S.bookShowAuthors=!S.bookShowAuthors;render()">${S.bookShowAuthors ? '이름 숨기기' : '누가 썼는지 보기'}</button>
+        <button class="btn ghost" onclick="window.print()">인쇄 / PDF 저장</button>
+      </div>`;
+    return;
+  }
+
+  if(st.needChoice){
+    const first = g.members[0];
+    if(first === S.me){
+      app.innerHTML = head + `
+      <div class="stack">
+        <div><span class="eyebrow">${esc(g.name)} · 첫 번째 작가</span>
+        <h2 class="title">이야기의 첫 문장을 골라 주세요</h2>
+        <p class="muted">고른 문장으로 우리 모둠의 이야기가 시작돼요.</p></div>
+        ${S.cls.prompts.map(p => `<button class="pick-card" onclick="choosePrompt('${g.id}','${jsq(p.id)}')">❝ ${esc(p.text)}</button>`).join('')}
+      </div>`;
+    } else {
+      app.innerHTML = head + `<div class="waiting-hero"><div class="big">🤔</div>
+        <h2>${esc(fullLabel(first))}이(가) 첫 문장을 고르고 있어요<span class="dots"></span></h2>
+        <p>곧 이야기가 시작됩니다.</p></div>`;
+    }
+    return;
+  }
+
+  const writer = currentWriter(st, g);
+  const myTurn = writer === S.me;
+  const total = S.cls.timeLimit;
+  const flash = S.flashTurn ? 'flash-turn' : ''; S.flashTurn = false;
+
+  app.innerHTML = head + `
+  <div class="stack">
+    <div class="spread">
+      <h2 class="title">${esc(g.name)}</h2>
+      <span class="pill" id="sentCount">📜 ${realCount(st)} / ${S.cls.maxSentences}문장</span>
+    </div>
+    <div class="card" style="padding:12px 14px">
+      <div class="order-track">
+        ${g.members.map(m => {
+          const isNow = m === writer;
+          return `<div class="order-stop ${isNow ? 'now' : ''} ${!isOnline(m) ? 'offline' : ''}">
+            <div class="face">${esc(shortFace(m))}${isNow ? '<span class="pen">✍️</span>' : ''}</div>
+            <div class="nm">${esc(fullLabel(m))}${m === S.me ? ' (나)' : ''}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div id="tickzone" data-deadline="${st.deadline}" data-total="${total}">
+        <div class="spread" style="margin:4px 0 6px">
+          <span class="muted">${myTurn ? '내 차례예요! ✨' : esc(fullLabel(writer)) + '이(가) 쓰는 중…'}</span>
+          <span class="timer-num">${fmtSec((st.deadline - now()) / 1000)}</span>
+        </div>
+        <div class="timerbar"><div class="fill" style="width:${Math.max(0, Math.min(100, (st.deadline - now()) / 1000 / total * 100))}%"></div></div>
+      </div>
+    </div>
+    ${manuscriptHtml(st, false)}
+    ${myTurn ? `
+    <div class="card myturn stack ${flash}">
+      <div class="spread"><h3>✍️ 다음 문장을 이어 쓰세요</h3><span class="muted">최소 ${S.cls.minChars}자</span></div>
+      <textarea id="sentInput" placeholder="앞 문장에 자연스럽게 이어지도록 한 문장을 써 보세요." maxlength="200"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();submitSentence('${g.id}')}">${esc(S.draft)}</textarea>
+      <div class="spread">
+        <span class="muted">Enter로 제출 · 시간이 다 되면 다음 친구에게 넘어가요</span>
+        <button class="btn rule" id="sendBtn" onclick="submitSentence('${g.id}')">문장 잇기</button>
+      </div>
+    </div>` : `
+    <div class="card" style="text-align:center">
+      <p class="muted">지금은 <b>${esc(fullLabel(writer))}</b> 차례예요. 내 차례가 되면 소리로 알려 드릴게요 🔔</p>
+    </div>`}
+  </div>`;
+
+  if(myTurn){
+    const ta = $('#sentInput');
+    if(ta){ ta.addEventListener('input', e => S.draft = e.target.value); ta.focus(); const v = ta.value; ta.value = ''; ta.value = v; }
+  } else { S.draft = ''; }
+}
+function manuscriptHtml(st, teacherMode, gid){
+  return `<div class="manuscript" ${teacherMode ? 'style="margin-top:8px"' : ''}>
+    <div class="prompt-line">${esc(st.prompt || '(주제 선택 대기)')}</div>
+    ${st.sentences.map((s, i) => s.skip
+      ? `<div class="sent skip">— ${esc(fullLabel(s.a))} 차례를 건너뛰었어요 —</div>`
+      : `<div class="sent" ${teacherMode ? `title="누르면 삭제" style="cursor:pointer" onclick="teacherDelSentence('${gid}',${i})"` : ''}><span class="seal">${esc(nameOf(s.a))}</span>${esc(s.t)}</div>`).join('')}
+    ${!st.sentences.length && !teacherMode ? '<div class="empty">아직 이어진 문장이 없어요. 첫 문장을 이어 주세요!</div>' : ''}
+  </div>`;
+}
+function lobbyPeers(){
+  const on = onlineList().sort((a, b) => Number(a) - Number(b));
+  return `<div class="card" style="margin-top:14px">
+    <div class="spread"><h3>지금 접속한 친구들</h3><span class="pill on"><span class="dot"></span>${on.length}명</span></div>
+    <div style="margin-top:8px">${on.length ? on.map(n => `<span class="member-chip">${esc(fullLabel(n))}</span>`).join('') : '<span class="muted">아직 아무도 없어요.</span>'}</div>
+  </div>`;
+}
+
+async function choosePrompt(gid, pid){
+  const p = S.cls.prompts.find(x => x.id === pid); if(!p) return;
+  const me = S.me;
+  await storyRef(gid).transaction(cur => {
+    if(!cur) return cur;
+    const s = normStory(cur); const g = groupById(gid);
+    if(!s.needChoice || !g || g.members[0] !== me) return;
+    s.prompt = p.text; s.needChoice = false; s.turn = 0;
+    s.deadline = now() + S.cls.timeLimit * 1000;
+    return s;
+  });
+  toast('이야기가 시작되었어요!');
+}
+
+async function submitSentence(gid){
+  const ta = $('#sentInput');
+  const text = (ta?.value || '').trim().replace(/\s+/g, ' ');
+  if(text.length < S.cls.minChars){ toast(`문장을 ${S.cls.minChars}자 이상 써 주세요`); return; }
+  const btn = $('#sendBtn'); if(btn) btn.disabled = true;
+  const me = S.me; let added = false;
+  try{
+    const res = await storyRef(gid).transaction(cur => {
+      added = false;
+      if(!cur) return cur;
+      const s = normStory(cur); const g = groupById(gid);
+      if(!g || s.done || s.needChoice || currentWriter(s, g) !== me) return;
+      s.sentences.push({ a: me, t: text, ts: now() });
+      if(realCount(s) >= S.cls.maxSentences){ s.done = true; s.deadline = null; s.endedBy = 'auto'; }
+      else { s.turn = (s.turn + 1) % g.members.length; s.deadline = now() + S.cls.timeLimit * 1000; }
+      added = true;
+      return s;
+    });
+    if(res.committed && added){ S.draft = ''; if(ta) ta.blur(); toast('문장을 이었어요! ✏️'); }
+    else { if(ta) ta.blur(); toast('차례가 지나 제출되지 않았어요'); }
+  }catch(e){ toast('저장하지 못했어요. 인터넷 연결을 확인해 주세요.'); if(btn) btn.disabled = false; }
+  doRender();
+}
+
+/* =====================================================
+   교사: PIN → 반 목록
+   ===================================================== */
+async function goTeacher(){
+  await ensureAuth();
+  if(isTeacherUser()){ enterClasses(); return; }
+  S.screen = 'pinEntry'; render();
+}
+function renderPin(){
+  app.innerHTML = topbar(`<button class="btn small ghost" onclick="backToLanding()">← 처음으로</button>`) + `
+  <div class="card stack" style="max-width:420px;margin:40px auto">
+    <div><span class="eyebrow">Teacher</span><h2 class="title">교사 모드 입장</h2></div>
+    <p class="muted">교사 비밀번호를 입력하세요.</p>
+    <input id="pinInput" type="password" inputmode="numeric" placeholder="비밀번호" maxlength="12"
+      onkeydown="if(event.key==='Enter')checkPin()">
+    <button class="btn" id="pinBtn" onclick="checkPin()">입장하기</button>
+  </div>`;
+  setTimeout(() => $('#pinInput')?.focus(), 50);
+}
+async function checkPin(){
+  const input = $('#pinInput'); const pw = input.value.trim();
+  if(!pw){ toast('비밀번호를 입력해 주세요'); return; }
+  const btn = $('#pinBtn'); if(btn){ btn.disabled = true; btn.textContent = '확인 중…'; }
+  try{
+    await auth.signInWithEmailAndPassword(TEACHER_EMAIL, pw);
+    if(!isTeacherUser()){ await auth.signOut(); throw { code: 'not-teacher' }; }
+    input.blur();
+    enterClasses();
+  }catch(e){
+    const c = String(e && e.code || '');
+    toast(/too-many/.test(c) ? '시도가 너무 많아요. 잠시 후 다시 해 주세요.'
+        : /network/.test(c) ? '인터넷 연결을 확인해 주세요'
+        : '비밀번호가 일치하지 않아요');
+    input.value = '';
+    if(btn){ btn.disabled = false; btn.textContent = '입장하기'; }
+  }
+}
+async function teacherLogout(){
+  if(!confirm('교사 모드를 종료할까요? 다음에 들어올 때 비밀번호를 다시 입력해요.')) return;
+  backToLanding();
+  await auth.signOut();
+  await ensureAuth();
+}
+function enterClasses(){
+  if(!isTeacherUser()){ S.screen = 'pinEntry'; render(); return; }
+  unsubscribeClass();
+  S.role = 'teacher'; S.cid = null; S.cls = null; S.classList = null;
+  S.screen = 'classes'; render(); loadClassList();
+}
+function renderClasses(){
+  const head = topbar(`<button class="btn small ghost" onclick="teacherLogout()">교사 모드 종료(로그아웃)</button>`);
+  app.innerHTML = head + `<div class="stack">
+    <div><span class="eyebrow">Teacher</span><h2 class="title">반 목록</h2>
+    <p class="muted">여러 반을 만들어 두고 수업할 반을 골라 들어가세요. 반마다 명단·모둠·주제·문집이 따로 저장돼요.</p></div>
+    ${!S.classList ? loadingHtml() : S.classList.length ? `<div class="class-grid">${S.classList.map(c => `
+      <button class="class-card" onclick="openClass('${jsq(c.id)}')"><b>${esc(c.name)}</b><span>${c.count || 0}명 · ${c.createdAt ? fmtDate(c.createdAt).split(' ')[0] : ''}</span></button>`).join('')}</div>`
+      : '<p class="muted">아직 만든 반이 없어요. 아래에서 첫 반을 만들어 보세요.</p>'}
+    <div class="card stack">
+      <h3>＋ 새 반 만들기</h3>
+      <input id="newClassName" placeholder="반 이름 (예: 4학년 2반)">
+      <div>
+        <p class="muted" style="margin-bottom:6px">학생 명단 — 한 줄에 한 명씩 <b>번호 이름</b> 형식으로 적어 주세요. 이름 없이 번호만 써도 돼요.</p>
+        <textarea id="newRoster" rows="7" placeholder="1 김민준&#10;2 이서연&#10;3 박지호&#10;..."></textarea>
+        <div class="row" style="margin-top:8px">
+          <span class="muted">또는 번호만 빠르게:</span>
+          <input id="quickCount" type="number" min="2" max="60" placeholder="학생 수" style="width:110px">
+          <button class="btn small soft" onclick="fillNumbers()">1번~N번 채우기</button>
+        </div>
+      </div>
+      <button class="btn" onclick="createClass()">반 만들기</button>
+    </div>
+  </div>`;
+}
+function fillNumbers(){
+  const n = Math.max(2, Math.min(60, Number($('#quickCount').value) || 0));
+  if(!n){ toast('학생 수를 입력해 주세요'); return; }
+  $('#newRoster').value = Array.from({length: n}, (_, i) => String(i + 1)).join('\n');
+}
+function parseRoster(txt){
+  const out = []; const used = new Set();
+  txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach((line, i) => {
+    const m = line.match(/^(\d+)\s*[.)\-:,번]?\s*(.*)$/);
+    let no = m ? m[1] : String(i + 1);
+    let name = (m ? m[2] : line).trim();
+    no = String(Number(no));
+    if(used.has(no)){ let k = Number(no); while(used.has(String(k))) k++; no = String(k); }
+    used.add(no); out.push({ no, name });
+  });
+  return out.sort((a, b) => Number(a.no) - Number(b.no));
+}
+function autoGroups(roster, size){
+  size = Math.max(2, size || 4);
+  const nos = roster.map(r => r.no);
+  const count = Math.max(1, Math.ceil(nos.length / size));
+  const groups = Array.from({length: count}, (_, i) => ({ id: 'g' + uid(), name: (i + 1) + '모둠', members: [], prompt: 'CHOICE' }));
+  nos.forEach((n, i) => groups[i % count].members.push(n));
+  return groups;
+}
+async function createClass(){
+  const name = $('#newClassName').value.trim();
+  const roster = parseRoster($('#newRoster').value);
+  if(!name){ toast('반 이름을 입력해 주세요'); return; }
+  if(roster.length < 2){ toast('학생을 2명 이상 입력해 주세요'); return; }
+  const cid = db.ref('classes').push().key;
+  const cls = { name, createdAt: now(), roster, groups: autoGroups(roster, 4), prompts: defaultPrompts(),
+    timeLimit: 90, maxSentences: 12, groupSize: 4, minChars: 5, phase: 'lobby', session: 0, archivedSession: 0 };
+  await db.ref().update({
+    [`classes/${cid}`]: cls,
+    [`classList/${cid}`]: { name, count: roster.length, createdAt: cls.createdAt },
+  });
+  toast(`${name}을(를) 만들었어요`);
+  openClass(cid);
+}
+function openClass(cid){
+  subscribeClass(cid);
+  S.teacherTab = 'live'; S.archIdx = null;
+  S.screen = 'teacher'; render();
+}
+
+/* =====================================================
+   교사 대시보드
+   ===================================================== */
+function renderTeacher(){
+  const head = topbar(`<button class="btn small ghost" onclick="enterClasses()">← 반 목록</button>`);
+  if(!S.cls){ app.innerHTML = head + loadingHtml(); return; }
+  const on = onlineList();
+  const writing = S.cls.phase === 'writing';
+  const tabs = [
+    ['live', writing ? '진행 상황' : '모둠 편성'],
+    ['students', `접속 (${on.length}/${S.cls.roster.length})`],
+    ['prompts', '주제'],
+    ['settings', '설정'],
+    ['archive', '문집'],
+  ];
+  app.innerHTML = head + `
+  <div class="stack">
+    <div class="spread"><h2 class="title">${esc(S.cls.name)}</h2><span class="pill ${writing ? 'me' : ''}">${writing ? '✍️ 글쓰기 진행 중' : '⏸ 대기 중'}</span></div>
+    <div class="tabs no-print">${tabs.map(([k, l]) => `<button class="${S.teacherTab === k ? 'active' : ''}" onclick="S.teacherTab='${k}';render()">${l}</button>`).join('')}</div>
+    <div id="tabBody"></div>
+  </div>`;
+  const body = $('#tabBody');
+  if(S.teacherTab === 'live') body.innerHTML = writing ? tLive() : tGroups();
+  else if(S.teacherTab === 'students') body.innerHTML = tStudents();
+  else if(S.teacherTab === 'prompts') body.innerHTML = tPrompts();
+  else if(S.teacherTab === 'settings') body.innerHTML = tSettings();
+  else if(S.teacherTab === 'archive') body.innerHTML = tArchive();
+}
+const saveGroups = groups => classRef('groups').set(groups);
+const cloneGroups = () => S.cls.groups.map(g => ({ ...g, members: [...g.members] }));
+
+/* ---- 모둠 편성 ---- */
+function tGroups(){
+  const assigned = new Set(S.cls.groups.flatMap(g => g.members));
+  const unassigned = S.cls.roster.filter(r => !assigned.has(r.no));
+  return `<div class="stack">
+    <div class="card stack">
+      <div class="spread">
+        <div><h3>모둠 편성</h3><p class="muted">◀▶ 순서 변경 · ⇄ 다른 모둠으로 이동 · × 모둠에서 빼기. 1번 자리 학생이 첫 문장을 고르고 씁니다.</p></div>
+        <div class="row">
+          <button class="btn small soft" onclick="regroup(false)">번호순 편성</button>
+          <button class="btn small soft" onclick="regroup(true)">🔀 무작위 편성</button>
+          <button class="btn small soft" onclick="addGroup()">＋ 모둠 추가</button>
+        </div>
+      </div>
+      <p class="muted">모둠당 ${S.cls.groupSize}명 기준 (설정 탭에서 변경)</p>
+      ${S.cls.groups.map(g => groupEditCard(g)).join('')}
+      ${unassigned.length ? `<div class="card" style="background:var(--paper-deep)"><b>미배정</b> ${unassigned.map(r => `<span class="member-chip">${esc(fullLabel(r.no))} <span class="mv" onclick="transferMember('${jsq(r.no)}')">⇄ 배정</span></span>`).join('')}</div>` : ''}
+    </div>
+    <div class="card stack">
+      <div class="spread"><h3>글쓰기 시작</h3><span class="muted">제한시간 ${S.cls.timeLimit}초 · 모둠당 ${S.cls.maxSentences}문장</span></div>
+      <p class="muted">모둠별 시작 주제를 정해 두면 그 문장으로 바로 시작하고, ‘첫 학생이 선택’이면 1번 자리 학생이 주제 목록에서 고릅니다.</p>
+      <button class="btn rule" style="font-size:17px;padding:14px" onclick="startSession()">✍️ 모든 모둠 글쓰기 시작</button>
+    </div>
+  </div>`;
+}
+function groupEditCard(g){
+  return `<div class="group-card stack" style="gap:8px">
+    <div class="spread">
+      <b>${esc(g.name)} <span class="muted">(${g.members.length}명)</span></b>
+      <span class="mv" style="cursor:pointer;color:var(--rule);font-size:13px" onclick="removeGroup('${g.id}')">모둠 삭제</span>
+    </div>
+    <div>${g.members.map((m, i) => `
+      <span class="member-chip">
+        <span class="badge-num" style="background:var(--ink)">${i + 1}</span> ${isOnline(m) ? '🟢' : '⚪'} ${esc(fullLabel(m))}
+        <span class="mv" title="앞으로" onclick="moveMember('${g.id}',${i},-1)">◀</span>
+        <span class="mv" title="뒤로" onclick="moveMember('${g.id}',${i},1)">▶</span>
+        <span class="mv" title="다른 모둠으로" onclick="transferMember('${jsq(m)}')">⇄</span>
+        <span class="x" title="모둠에서 빼기" onclick="unassign('${jsq(m)}')">×</span>
+      </span>`).join('') || '<span class="muted">모둠원이 없어요</span>'}
+    </div>
+    <div class="row"><span class="muted" style="flex:0 0 auto">시작 주제</span><div style="flex:1;min-width:200px">
+      <select onchange="setGroupPrompt('${g.id}', this.value)">
+        <option value="CHOICE" ${g.prompt === 'CHOICE' ? 'selected' : ''}>🎲 첫 학생이 주제 선택</option>
+        ${S.cls.prompts.map(p => `<option value="${esc(p.id)}" ${g.prompt === p.text ? 'selected' : ''}>${esc(p.text.slice(0, 30))}${p.text.length > 30 ? '…' : ''}</option>`).join('')}
+      </select></div></div>
+  </div>`;
+}
+async function regroup(shuffle){
+  if(S.cls.phase === 'writing' && !confirm('글쓰기 중이에요. 그래도 모둠을 다시 편성할까요?')) return;
+  let roster = [...S.cls.roster];
+  if(shuffle) roster = roster.sort(() => Math.random() - .5);
+  await saveGroups(autoGroups(roster, S.cls.groupSize));
+  toast(shuffle ? '무작위로 편성했어요' : '번호순으로 편성했어요');
+}
+async function addGroup(){ const gs = cloneGroups(); gs.push({ id: 'g' + uid(), name: (gs.length + 1) + '모둠', members: [], prompt: 'CHOICE' }); await saveGroups(gs); }
+async function removeGroup(gid){
+  const g = groupById(gid);
+  if(g && g.members.length && !confirm(`${g.name}을(를) 삭제할까요? 모둠원은 미배정으로 돌아가요.`)) return;
+  await saveGroups(cloneGroups().filter(x => x.id !== gid));
+}
+async function moveMember(gid, idx, dir){
+  const gs = cloneGroups(); const g = gs.find(x => x.id === gid); const j = idx + dir;
+  if(!g || j < 0 || j >= g.members.length) return;
+  [g.members[idx], g.members[j]] = [g.members[j], g.members[idx]];
+  await saveGroups(gs);
+}
+async function unassign(no){ await saveGroups(cloneGroups().map(g => ({ ...g, members: g.members.filter(m => m !== no) }))); }
+async function transferMember(no){
+  const opts = S.cls.groups.map((g, i) => `${i + 1}. ${g.name} (${g.members.length}명)`).join('\n');
+  const v = prompt(`${fullLabel(no)}을(를) 몇 번 모둠으로 옮길까요?\n${opts}`);
+  if(v === null) return;
+  const i = parseInt(v) - 1;
+  if(isNaN(i) || !S.cls.groups[i]){ toast('모둠 번호를 확인해 주세요'); return; }
+  const gs = cloneGroups().map(g => ({ ...g, members: g.members.filter(m => m !== no) }));
+  gs[i].members.push(no);
+  await saveGroups(gs);
+  toast(`${fullLabel(no)} → ${gs[i].name}`);
+}
+async function setGroupPrompt(gid, val){
+  const gs = cloneGroups(); const g = gs.find(x => x.id === gid); if(!g) return;
+  if(val === 'CHOICE') g.prompt = 'CHOICE';
+  else { const p = S.cls.prompts.find(x => x.id === val); g.prompt = p ? p.text : 'CHOICE'; }
+  document.activeElement?.blur();
+  await saveGroups(gs);
+  toast('시작 주제를 정했어요');
+}
+
+/* ---- 시작 / 종료 ---- */
+async function startSession(){
+  const active = S.cls.groups.filter(g => g.members.length > 0);
+  if(!active.length){ toast('모둠원이 있는 모둠이 없어요'); return; }
+  if(active.some(g => g.prompt === 'CHOICE') && !S.cls.prompts.length){ toast('주제 탭에서 주제를 1개 이상 만들어 주세요'); return; }
+  const stories = {};
+  for(const g of active){
+    const assigned = g.prompt && g.prompt !== 'CHOICE' ? g.prompt : null;
+    stories[g.id] = { prompt: assigned, needChoice: !assigned, turn: 0,
+      deadline: assigned ? now() + S.cls.timeLimit * 1000 : null,
+      sentences: [], done: false, startedAt: now() };
+  }
+  await db.ref().update({
+    [`stories/${S.cid}`]: stories,
+    [`classes/${S.cid}/phase`]: 'writing',
+    [`classes/${S.cid}/session`]: (S.cls.session || 0) + 1,
+  });
+  S.teacherTab = 'live'; toast('글쓰기를 시작했어요!');
+}
+async function endSession(){
+  if(!confirm('모든 모둠의 글쓰기를 종료하고 문집으로 보관할까요?\n학생 화면에는 완성된 책이 표시됩니다.')) return;
+  const updates = {};
+  for(const gid of Object.keys(S.stories)){
+    updates[`stories/${S.cid}/${gid}/done`] = true;
+    updates[`stories/${S.cid}/${gid}/deadline`] = null;
+    updates[`stories/${S.cid}/${gid}/endedBy`] = 'teacher';
+  }
+  await db.ref().update(updates);
+  await archiveCurrent();
+  toast('문집으로 보관했어요 📚 다 읽은 뒤 [대기 상태로 돌아가기]를 누르세요.');
+}
+async function archiveCurrent(){
+  const snap = await classRef().once('value');
+  const cls = normClass(snap.val()); if(!cls) return;
+  if(cls.archivedSession === cls.session) return;
+  const sSnap = await db.ref('stories/' + S.cid).once('value');
+  const sv = sSnap.val() || {};
+  const stories = [];
+  for(const g of cls.groups){
+    const st = normStory(sv[g.id]);
+    if(!st || !st.prompt || !st.sentences.some(x => !x.skip)) continue;
+    stories.push({
+      gname: g.name,
+      members: g.members.map(fullLabel),
+      prompt: st.prompt,
+      sentences: st.sentences.filter(x => !x.skip).map(x => ({ a: nameOf(x.a), t: x.t })),
+    });
+  }
+  const updates = { [`classes/${S.cid}/archivedSession`]: cls.session };
+  if(stories.length){
+    const aid = db.ref('archives/' + S.cid).push().key;
+    const date = now();
+    const title = `${cls.name} 문집 · ${fmtDate(date)}`;
+    updates[`archives/${S.cid}/${aid}`] = { date, title, stories };
+    updates[`archiveIndex/${S.cid}/${aid}`] = { date, title, count: stories.length };
+  }
+  await db.ref().update(updates);
+  S.archIdx = null;
+}
+async function resetToLobby(){
+  await archiveCurrent();
+  await classRef('phase').set('lobby');
+  toast('대기 상태로 돌아왔어요');
+}
+
+/* ---- 진행 상황 ---- */
+function tLive(){
+  const active = S.cls.groups.filter(g => g.members.length > 0 && S.stories[g.id]);
+  const allDone = active.length && active.every(g => S.stories[g.id].done);
+  return `<div class="stack">
+    <div class="card spread">
+      <div><h3>실시간 진행 상황</h3><p class="muted">‘이야기 펼쳐 보기’에서 문장을 누르면 삭제할 수 있어요.</p></div>
+      ${allDone
+        ? `<button class="btn" onclick="resetToLobby()">↩ 대기 상태로 돌아가기</button>`
+        : `<button class="btn rule" onclick="endSession()">■ 전체 종료 & 문집 보관</button>`}
+    </div>
+    ${active.map(g => {
+      const st = S.stories[g.id];
+      const writer = currentWriter(st, g);
+      const live = !st.done && !st.needChoice;
+      return `<div class="group-card stack ${live ? 'writing-now' : ''}" style="gap:8px">
+        <div class="spread">
+          <b>${esc(g.name)} ${st.done ? '✅ 완료' : st.needChoice ? '🎲 주제 고르는 중' : ''}</b>
+          <span class="muted">${realCount(st)}/${S.cls.maxSentences}문장</span>
+        </div>
+        <div>${g.members.map(m => `<span class="member-chip ${m === writer && live ? 'turn-now' : ''}">${isOnline(m) ? '🟢' : '⚪'} ${esc(fullLabel(m))}${m === writer && live ? ' ✍️' : ''}</span>`).join('')}</div>
+        ${live ? `
+          <div data-deadline="${st.deadline}" data-total="${S.cls.timeLimit}">
+            <div class="spread"><span class="muted">${esc(fullLabel(writer))} 차례</span><span class="timer-num">${fmtSec((st.deadline - now()) / 1000)}</span></div>
+            <div class="timerbar"><div class="fill" style="width:${Math.max(0, Math.min(100, (st.deadline - now()) / 1000 / S.cls.timeLimit * 100))}%"></div></div>
+          </div>
+          <div class="row no-print">
+            <button class="btn small soft" onclick="teacherSkip('${g.id}')">⏭ 이 차례 건너뛰기</button>
+            <button class="btn small soft" onclick="addTime('${g.id}')">＋30초</button>
+            <button class="btn small soft" onclick="teacherFinishGroup('${g.id}')">이 모둠만 완료</button>
+          </div>` : ''}
+        <details ${st.done ? 'open' : ''}>
+          <summary style="cursor:pointer;font-size:13.5px;color:var(--ink-soft)">이야기 펼쳐 보기</summary>
+          ${manuscriptHtml(st, true, g.id)}
+        </details>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function teacherSkip(gid){
+  storyRef(gid).transaction(cur => {
+    if(!cur) return cur;
+    const s = normStory(cur); const g = groupById(gid);
+    if(!g || s.done || s.needChoice) return;
+    s.sentences.push({ a: currentWriter(s, g), t: '', skip: true, ts: now() });
+    s.turn = (s.turn + 1) % g.members.length; s.deadline = now() + S.cls.timeLimit * 1000;
+    return s;
+  });
+}
+function addTime(gid){
+  storyRef(gid).child('deadline').transaction(d => d ? Math.max(d, now()) + 30000 : d);
+}
+async function teacherFinishGroup(gid){
+  if(!confirm('이 모둠의 글쓰기를 완료할까요?')) return;
+  await storyRef(gid).update({ done: true, deadline: null, endedBy: 'teacher' });
+}
+function teacherDelSentence(gid, idx){
+  if(!confirm('이 문장을 삭제할까요?')) return;
+  storyRef(gid).transaction(cur => {
+    if(!cur) return cur;
+    const s = normStory(cur); if(!s.sentences[idx]) return;
+    s.sentences.splice(idx, 1); return s;
+  });
+}
+
+/* ---- 학생 / 접속 ---- */
+function tStudents(){
+  return `<div class="stack">
+  <div class="card stack">
+    <div><h3>학생 접속 현황</h3><p class="muted">🟢 접속 중 · ⚪ 미접속 · 강퇴하면 그 기기는 바로 첫 화면으로 나가요(다시 입장 가능).</p></div>
+    <div>${S.cls.roster.map(r => {
+      const g = S.cls.groups.find(x => x.members.includes(r.no));
+      return `<div class="stu-row">
+        <span>${isOnline(r.no) ? '🟢' : '⚪'} <b>${esc(fullLabel(r.no))}</b> <span class="muted">${g ? esc(g.name) : '미배정'}</span></span>
+        <span class="row">
+          <button class="btn small soft" onclick="transferMember('${jsq(r.no)}')">모둠 이동</button>
+          ${isOnline(r.no) ? `<button class="btn small" style="background:var(--rule);color:#fff" onclick="kickStudent('${jsq(r.no)}')">강퇴</button>` : ''}
+        </span>
+      </div>`;
+    }).join('')}</div>
+  </div>
+  <div class="card stack">
+    <h3>명단 수정</h3>
+    <p class="muted">한 줄에 한 명씩 <b>번호 이름</b>. 빠진 번호의 학생은 모둠에서도 빠져요.</p>
+    <textarea id="rosterEdit" rows="8">${esc(S.cls.roster.map(r => (r.no + ' ' + r.name).trim()).join('\n'))}</textarea>
+    <button class="btn" onclick="saveRoster()">명단 저장</button>
+  </div>
+  </div>`;
+}
+async function kickStudent(no){
+  if(!confirm(`${fullLabel(no)}의 연결을 해제할까요?`)) return;
+  const p = S.presence[no];
+  await db.ref().update({
+    [`classes/${S.cid}/kicked/${no}`]: p && p.sid ? p.sid : 'x',
+    [`presence/${S.cid}/${no}`]: null,
+  });
+  toast(`${fullLabel(no)}을(를) 내보냈어요`);
+}
+async function saveRoster(){
+  const roster = parseRoster($('#rosterEdit').value);
+  if(roster.length < 2){ toast('2명 이상 필요해요'); return; }
+  const nos = new Set(roster.map(r => r.no));
+  const groups = cloneGroups().map(g => ({ ...g, members: g.members.filter(m => nos.has(m)) }));
+  document.activeElement?.blur();
+  await db.ref().update({
+    [`classes/${S.cid}/roster`]: roster,
+    [`classes/${S.cid}/groups`]: groups,
+    [`classList/${S.cid}/count`]: roster.length,
+  });
+  toast('명단을 저장했어요. 새 학생은 모둠 편성에서 배정해 주세요.');
+}
+
+/* ---- 주제 ---- */
+function tPrompts(){
+  return `<div class="card stack">
+    <div><h3>시작 문장 / 주제</h3><p class="muted">모둠에 직접 배정하거나, 1번 자리 학생이 이 목록에서 고르게 할 수 있어요.</p></div>
+    <div>${S.cls.prompts.map(p => `<div class="prompt-item">
+        <p>❝ ${esc(p.text)}</p>
+        <button class="btn small soft" onclick="editPrompt('${jsq(p.id)}')">수정</button>
+        <button class="btn small soft" onclick="delPrompt('${jsq(p.id)}')">삭제</button>
+      </div>`).join('') || '<p class="muted">아직 주제가 없어요.</p>'}</div>
+    <div class="row">
+      <input id="newPrompt" placeholder="예) 그날 밤, 운동장 한가운데에 우주선이 내려앉았다." style="flex:1;min-width:220px"
+        onkeydown="if(event.key==='Enter'&&!event.isComposing)addPrompt()">
+      <button class="btn" onclick="addPrompt()">추가</button>
+    </div>
+  </div>`;
+}
+async function addPrompt(){
+  const el = $('#newPrompt'); const v = el.value.trim();
+  if(!v){ toast('내용을 입력해 주세요'); return; }
+  el.value = ''; el.blur();
+  await classRef('prompts').set([...S.cls.prompts, { id: uid(), text: v }]);
+}
+async function editPrompt(id){
+  const p = S.cls.prompts.find(x => x.id === id); if(!p) return;
+  const v = prompt('주제 수정', p.text); if(v === null || !v.trim()) return;
+  await classRef('prompts').set(S.cls.prompts.map(x => x.id === id ? { ...x, text: v.trim() } : x));
+}
+async function delPrompt(id){ await classRef('prompts').set(S.cls.prompts.filter(x => x.id !== id)); }
+
+/* ---- 설정 ---- */
+function tSettings(){
+  const r = S.cls;
+  return `<div class="stack"><div class="card stack">
+    <h3>진행 설정</h3>
+    <div class="setting-row"><label><b>한 사람당 제한 시간</b><span>차례가 오면 이 시간 안에 써야 해요</span></label>
+      <select onchange="setCfg('timeLimit', Number(this.value))">${[30,45,60,90,120,180,300].map(v => `<option value="${v}" ${r.timeLimit === v ? 'selected' : ''}>${v < 60 ? v + '초' : (v / 60) + '분'}${v === 90 ? '' : ''}</option>`).join('')}</select></div>
+    <div class="setting-row"><label><b>모둠당 총 문장 수</b><span>이 수를 채우면 이야기가 완성돼요</span></label>
+      <input type="number" min="3" max="60" value="${r.maxSentences}" onchange="setCfg('maxSentences', Math.max(3,Math.min(60,Number(this.value)||12)))"></div>
+    <div class="setting-row"><label><b>모둠당 인원</b><span>번호순·무작위 편성의 기준 인원</span></label>
+      <input type="number" min="2" max="10" value="${r.groupSize}" onchange="setCfg('groupSize', Math.max(2,Math.min(10,Number(this.value)||4)))"></div>
+    <div class="setting-row"><label><b>문장 최소 글자 수</b><span>너무 짧은 장난 문장을 막아요</span></label>
+      <input type="number" min="1" max="50" value="${r.minChars}" onchange="setCfg('minChars', Math.max(1,Math.min(50,Number(this.value)||5)))"></div>
+    <div class="setting-row"><label><b>반 이름</b><span>학생 반 선택 화면에 보이는 이름</span></label>
+      <input type="text" value="${esc(r.name)}" style="width:160px" onchange="renameClass(this.value)"></div>
+    <p class="muted">진행 중에 제한 시간을 바꾸면 다음 차례부터 적용돼요.</p>
+  </div>
+  <div class="card stack">
+    <h3>반 삭제</h3>
+    <p class="muted">이 반의 명단·모둠·진행 중인 글·문집이 모두 지워져요. 되돌릴 수 없어요.</p>
+    <button class="btn ghost" style="border-color:var(--rule);color:var(--rule)" onclick="deleteClass()">이 반 삭제하기</button>
+  </div></div>`;
+}
+async function setCfg(k, v){ document.activeElement?.blur(); await classRef(k).set(v); toast('저장했어요'); }
+async function renameClass(v){
+  v = v.trim(); if(!v) return;
+  document.activeElement?.blur();
+  await db.ref().update({ [`classes/${S.cid}/name`]: v, [`classList/${S.cid}/name`]: v });
+  toast('반 이름을 바꿨어요');
+}
+async function deleteClass(){
+  const name = S.cls.name;
+  const typed = prompt(`정말 삭제하려면 반 이름 "${name}"을(를) 그대로 입력하세요.`);
+  if(typed === null) return;
+  if(typed.trim() !== name){ toast('반 이름이 일치하지 않아요'); return; }
+  const cid = S.cid;
+  unsubscribeClass();
+  await db.ref().update({
+    [`classes/${cid}`]: null, [`classList/${cid}`]: null, [`stories/${cid}`]: null,
+    [`presence/${cid}`]: null, [`archives/${cid}`]: null, [`archiveIndex/${cid}`]: null,
+  });
+  toast(`${name}을(를) 삭제했어요`);
+  enterClasses();
+}
+
+/* =====================================================
+   문집 (보관함 & 책 보기)
+   ===================================================== */
+async function loadArchIdx(){
+  const snap = await db.ref('archiveIndex/' + S.cid).once('value');
+  const v = snap.val() || {};
+  S.archIdx = Object.entries(v).map(([id, a]) => ({ id, ...a })).sort((a, b) => b.date - a.date);
+  render();
+}
+function archListHtml(canDelete){
+  if(!S.archIdx){ loadArchIdx(); return loadingHtml(); }
+  if(!S.archIdx.length) return '<p class="muted">아직 보관된 문집이 없어요. 글쓰기를 마치면 이곳에 저장됩니다.</p>';
+  return S.archIdx.map(a => `
+    <div class="arch-item">
+      <span><b>${esc(a.title)}</b><br><span class="muted">이야기 ${a.count}편</span></span>
+      <span class="row">
+        <button class="btn small" onclick="openArch('${jsq(a.id)}')">펼쳐 보기</button>
+        ${canDelete ? `<button class="btn small soft" onclick="delArch('${jsq(a.id)}')">삭제</button>` : ''}
+      </span>
+    </div>`).join('');
+}
+function tArchive(){
+  return `<div class="card stack">
+    <div class="spread"><div><h3>📚 ${esc(S.cls.name)} 문집</h3><p class="muted">끝난 릴레이 글쓰기가 책으로 저장돼요. 학생들도 번호 선택 화면의 ‘우리 반 문집’에서 볼 수 있어요.</p></div>
+    <button class="btn small soft" onclick="S.archIdx=null;render()">새로고침</button></div>
+    ${archListHtml(true)}
+  </div>`;
+}
+function openStudentArchive(){ S.archIdx = null; S.screen = 'studentArchive'; render(); }
+function renderStudentArchive(){
+  app.innerHTML = topbar(`<button class="btn small ghost" onclick="S.screen='numberPick';render()">← 돌아가기</button>`) + `
+    <div class="card stack"><div><span class="eyebrow">Library</span><h2 class="title">📚 우리 반 문집</h2></div>${archListHtml(false)}</div>`;
+}
+async function openArch(id){
+  const snap = await db.ref(`archives/${S.cid}/${id}`).once('value');
+  const a = snap.val();
+  if(!a){ toast('문집을 찾을 수 없어요'); return; }
+  a.stories = toArr(a.stories).map(st => ({ ...st, members: toArr(st.members), sentences: toArr(st.sentences) }));
+  S.viewArch = a; S.viewArchFrom = S.screen; S.screen = 'bookView'; render();
+}
+async function delArch(id){
+  if(!confirm('이 문집을 삭제할까요? 되돌릴 수 없어요.')) return;
+  await db.ref().update({ [`archives/${S.cid}/${id}`]: null, [`archiveIndex/${S.cid}/${id}`]: null });
+  S.archIdx = null; render();
+}
+function bookTitle(prompt, gname){
+  const first = (prompt || '').replace(/[.!?…"'』」]+$/, '');
+  return first.length > 26 ? first.slice(0, 26) + '…' : (first || (gname ? gname + '의 이야기' : '우리의 이야기'));
+}
+function liveStoryForBook(st, g){
+  return { title: bookTitle(st.prompt, g.name), gname: g.name, authors: g.members.map(fullLabel), prompt: st.prompt,
+    sentences: st.sentences.filter(x => !x.skip).map(x => ({ a: nameOf(x.a), t: x.t })), date: now() };
+}
+function bookHtml(story){
+  const showA = S.bookShowAuthors;
+  const paras = []; let cur = [esc(story.prompt)];
+  story.sentences.forEach(s => {
+    cur.push((showA ? `<span class="who">${esc(s.a)}</span>` : '') + esc(s.t));
+    if(cur.length >= 4){ paras.push(cur.join(' ')); cur = []; }
+  });
+  if(cur.length) paras.push(cur.join(' '));
+  return `<div class="book">
+    <div class="spine"></div>
+    <div class="cover">
+      <div class="lbl">RELAY STORY · ${esc(story.gname || '')}</div>
+      <h2>${esc(story.title)}</h2>
+      <div class="authors">글 · ${story.authors.map(esc).join(' · ')}</div>
+    </div>
+    <div class="pagebody"><div class="story">${paras.map(p => `<p style="margin-bottom:1.1em;text-indent:1em">${p}</p>`).join('')}</div></div>
+    <div class="footerline">릴레이 원고지 · ${fmtDate(story.date || now())} · 총 ${story.sentences.length + 1}문장</div>
+  </div>`;
+}
+function renderBookView(){
+  const a = S.viewArch; if(!a){ S.screen = S.viewArchFrom || 'landing'; render(); return; }
+  app.innerHTML = topbar(`
+    <button class="btn small soft no-print" onclick="S.bookShowAuthors=!S.bookShowAuthors;render()">${S.bookShowAuthors ? '이름 숨기기' : '누가 썼는지 보기'}</button>
+    <button class="btn small ghost no-print" onclick="window.print()">인쇄 / PDF</button>
+    <button class="btn small no-print" onclick="S.screen=S.viewArchFrom||'landing';S.viewArch=null;render()">← 돌아가기</button>`) + `
+  <div class="stack">
+    <div class="no-print"><span class="eyebrow">Archive</span><h2 class="title">${esc(a.title)}</h2>
+    <p class="muted">이야기 ${a.stories.length}편</p></div>
+    ${a.stories.map(st => bookHtml({ title: bookTitle(st.prompt, st.gname), gname: st.gname, authors: st.members,
+      prompt: st.prompt, sentences: st.sentences, date: a.date })).join('<div style="height:22px"></div>')}
+  </div>`;
+}
+
+/* =====================================================
+   시작
+   ===================================================== */
+app.innerHTML = loadingHtml('연결하는 중');
+ensureAuth().then(() => render());
+
+</script>
+</body>
+</html>

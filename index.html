@@ -381,12 +381,33 @@ function normStory(v){
     startedAt: v.startedAt || 0,
   };
 }
+const DEFAULT_PROMPT_TEXTS = [
+  '어느 날 아침, 교실 문을 열자 책상들이 모두 사라져 있었다.',
+  '우리 반에 전학 온 아이는 사실 사람이 아니었다.',
+  '백 년 동안 잠들어 있던 도서관이 오늘 밤 깨어난다.',
+  '급식 시간, 내 식판 위의 브로콜리가 갑자기 말을 걸었다.',
+  '운동장 모래를 파다가 반짝이는 열쇠 하나를 발견했다.',
+  '우리 집 고양이가 밤마다 몰래 어딘가로 나간다는 걸 알게 되었다.',
+  '눈을 떠 보니 내 몸이 개미만큼 작아져 있었다.',
+  '할머니 다락방에서 찾은 낡은 지도에는 우리 학교가 그려져 있었다.',
+  '오늘부터 일주일 동안 어른들이 모두 사라진다는 방송이 나왔다.',
+  '수업 시간에 칠판에 쓴 글씨가 저절로 움직이기 시작했다.',
+  '생일 선물로 받은 상자 안에서 작은 용 한 마리가 눈을 깜빡였다.',
+  '비 오는 날, 우산을 펼치자 몸이 하늘로 둥실 떠올랐다.',
+  '학교 뒤뜰 오래된 나무에 아무도 본 적 없는 작은 문이 달려 있었다.',
+  '거울 속의 내가 나보다 1초 늦게 움직이기 시작했다.',
+  '로봇 청소기가 오늘따라 이상한 쪽지를 끌고 나왔다.',
+  '수학 시험지의 마지막 문제는 사실 보물을 찾는 암호였다.',
+  '현장 체험 학습 버스가 지도에 없는 마을에 멈춰 섰다.',
+  '내가 그린 그림 속 강아지가 종이 밖으로 뛰쳐나왔다.',
+  '어느 날 갑자기 동물들의 말이 들리기 시작했다.',
+  '타임머신을 타고 도착한 곳은 공룡이 사는 시대였다.',
+  '우리 반 교실 사물함 하나가 우주로 통하는 입구였다.',
+  '시간이 멈춘 세상에서 움직일 수 있는 사람은 나뿐이었다.',
+  '바닷가에서 주운 유리병 안에는 100년 전에 쓴 편지가 들어 있었다.',
+];
 function defaultPrompts(){
-  return [
-    {id: uid(), text: '어느 날 아침, 교실 문을 열자 책상들이 모두 사라져 있었다.'},
-    {id: uid(), text: '우리 반에 전학 온 아이는 사실 사람이 아니었다.'},
-    {id: uid(), text: '백 년 동안 잠들어 있던 도서관이 오늘 밤 깨어난다.'},
-  ];
+  return DEFAULT_PROMPT_TEXTS.map(text => ({ id: uid(), text }));
 }
 
 /* ---------- 조회 도우미 ---------- */
@@ -1277,7 +1298,8 @@ async function saveRoster(){
 /* ---- 주제 ---- */
 function tPrompts(){
   return `<div class="card stack">
-    <div><h3>시작 문장 / 주제</h3><p class="muted">모둠에 직접 배정하거나, 1번 자리 학생이 이 목록에서 고르게 할 수 있어요.</p></div>
+    <div class="spread"><div><h3>시작 문장 / 주제</h3><p class="muted">모둠에 직접 배정하거나, 1번 자리 학생이 이 목록에서 고르게 할 수 있어요. (${S.cls.prompts.length}개)</p></div>
+      ${DEFAULT_PROMPT_TEXTS.some(t => !S.cls.prompts.some(p => p.text === t)) ? `<button class="btn small soft" onclick="addDefaultPrompts()">＋ 기본 문장 추가</button>` : ''}</div>
     <div>${S.cls.prompts.map(p => `<div class="prompt-item">
         <p>❝ ${esc(p.text)}</p>
         <button class="btn small soft" onclick="editPrompt('${jsq(p.id)}')">수정</button>
@@ -1289,6 +1311,12 @@ function tPrompts(){
       <button class="btn" onclick="addPrompt()">추가</button>
     </div>
   </div>`;
+}
+async function addDefaultPrompts(){
+  const missing = DEFAULT_PROMPT_TEXTS.filter(t => !S.cls.prompts.some(p => p.text === t));
+  if(!missing.length){ toast('기본 문장이 모두 들어 있어요'); return; }
+  await classRef('prompts').set([...S.cls.prompts, ...missing.map(text => ({ id: uid(), text }))]);
+  toast(`기본 문장 ${missing.length}개를 추가했어요`);
 }
 async function addPrompt(){
   const el = $('#newPrompt'); const v = el.value.trim();

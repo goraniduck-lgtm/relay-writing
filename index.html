@@ -379,6 +379,7 @@ function normStory(v){
     done: !!v.done,
     endedBy: v.endedBy || null,
     startedAt: v.startedAt || 0,
+    choices: toArr(v.choices),
   };
 }
 const DEFAULT_PROMPT_TEXTS = [
@@ -765,8 +766,8 @@ function renderStudent(){
       <div class="stack">
         <div><span class="eyebrow">${esc(g.name)} · 첫 번째 작가</span>
         <h2 class="title">이야기의 첫 문장을 골라 주세요</h2>
-        <p class="muted">고른 문장으로 우리 모둠의 이야기가 시작돼요.</p></div>
-        ${S.cls.prompts.map(p => `<button class="pick-card" onclick="choosePrompt('${g.id}','${jsq(p.id)}')">❝ ${esc(p.text)}</button>`).join('')}
+        <p class="muted">세 문장 중 하나를 고르면 우리 모둠의 이야기가 시작돼요.</p></div>
+        ${(st.choices.length ? st.choices : S.cls.prompts).map(p => `<button class="pick-card" onclick="choosePrompt('${g.id}','${jsq(p.id)}')">❝ ${esc(p.text)}</button>`).join('')}
       </div>`;
     } else {
       app.innerHTML = head + `<div class="waiting-hero"><div class="big">🤔</div>
@@ -844,7 +845,8 @@ function lobbyPeers(){
 }
 
 async function choosePrompt(gid, pid){
-  const p = S.cls.prompts.find(x => x.id === pid); if(!p) return;
+  const st0 = S.stories[gid];
+  const p = ((st0 && st0.choices.length) ? st0.choices : S.cls.prompts).find(x => x.id === pid); if(!p) return;
   const me = S.me;
   await storyRef(gid).transaction(cur => {
     if(!cur) return cur;
@@ -1051,7 +1053,7 @@ function tGroups(){
     </div>
     <div class="card stack">
       <div class="spread"><h3>글쓰기 시작</h3><span class="muted">제한시간 ${S.cls.timeLimit}초 · 모둠당 ${S.cls.maxSentences}문장</span></div>
-      <p class="muted">모둠별 시작 주제를 정해 두면 그 문장으로 바로 시작하고, ‘첫 학생이 선택’이면 1번 자리 학생이 주제 목록에서 고릅니다.</p>
+      <p class="muted">모둠별 시작 주제를 정해 두면 그 문장으로 바로 시작하고, ‘첫 학생이 선택’이면 1번 자리 학생이 주제 목록에서 무작위로 뽑힌 3개 중 하나를 고릅니다(모둠마다 다르게 뽑혀요).</p>
       <button class="btn rule" style="font-size:17px;padding:14px" onclick="startSession()">✍️ 모든 모둠 글쓰기 시작</button>
     </div>
   </div>`;
@@ -1119,6 +1121,12 @@ async function setGroupPrompt(gid, val){
 }
 
 /* ---- 시작 / 종료 ---- */
+/* 주제 목록에서 겹치지 않게 n개 무작위로 뽑기 (모둠마다 따로) */
+function pickRandom(list, n){
+  const a = [...list];
+  for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a.slice(0, n).map(p => ({ id: p.id, text: p.text }));
+}
 async function startSession(){
   const active = S.cls.groups.filter(g => g.members.length > 0);
   if(!active.length){ toast('모둠원이 있는 모둠이 없어요'); return; }
@@ -1127,6 +1135,7 @@ async function startSession(){
   for(const g of active){
     const assigned = g.prompt && g.prompt !== 'CHOICE' ? g.prompt : null;
     stories[g.id] = { prompt: assigned, needChoice: !assigned, turn: 0,
+      choices: assigned ? null : pickRandom(S.cls.prompts, 3),
       deadline: assigned ? now() + S.cls.timeLimit * 1000 : null,
       sentences: [], done: false, startedAt: now() };
   }
@@ -1298,7 +1307,7 @@ async function saveRoster(){
 /* ---- 주제 ---- */
 function tPrompts(){
   return `<div class="card stack">
-    <div class="spread"><div><h3>시작 문장 / 주제</h3><p class="muted">모둠에 직접 배정하거나, 1번 자리 학생이 이 목록에서 고르게 할 수 있어요. (${S.cls.prompts.length}개)</p></div>
+    <div class="spread"><div><h3>시작 문장 / 주제</h3><p class="muted">모둠에 직접 배정하거나, 1번 자리 학생이 이 목록에서 무작위로 뽑힌 3개 중 고르게 할 수 있어요. (${S.cls.prompts.length}개)</p></div>
       ${DEFAULT_PROMPT_TEXTS.some(t => !S.cls.prompts.some(p => p.text === t)) ? `<button class="btn small soft" onclick="addDefaultPrompts()">＋ 기본 문장 추가</button>` : ''}</div>
     <div>${S.cls.prompts.map(p => `<div class="prompt-item">
         <p>❝ ${esc(p.text)}</p>

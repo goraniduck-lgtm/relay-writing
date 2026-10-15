@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>릴레이 그리기 교사판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="common.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand" id="brand">릴레이 그리기 · 교사</div>
+    <div class="seg" role="group" aria-label="메뉴" id="tabs" hidden>
+      <button data-tab="status">진행 현황</button>
+      <button data-tab="classes">반 관리</button>
+      <button data-tab="sets">제시어 세트</button>
+    </div>
+  </div>
+  <main id="app"><div class="panel empty"><h2>연결하는 중</h2></div></main>
+</div>
+<div id="overlay"></div>
+
+<script>
+/* 처음 한 번 넣는 기본 제시어 8세트 (1~4세트는 선생님 한글 파일 그대로) */
+const DEFAULT_SETS = [
+  ['1세트 · 추석과 운동','모둠원들과 강강술래 5바퀴 돌기','양궁 송편 수영 보름달 축구 방귀 태권도 변기 강강술래 한복 배드민턴 윷놀이 허수아비 외계인 단풍잎 상어 코딱지 잠자리 바퀴벌레'],
+  ['2세트 · 가을과 운동','선생님께 큰절하기','역도 동그랑땡 펜싱 제기차기 도토리 탁구 좀비 오징어 농구 다람쥐 모기 씨름 메뚜기 배구 용돈 해골 달토끼 두더지 줄다리기'],
+  ['3세트 · 웃긴 그림 1','만세 3번 외치기','사과 똥 우산 물고기 안경 눈사람 달팽이 기린 문어 외계인 코끼리 방귀 콧물 허수아비 낙하산 공룡 엘리베이터 하마 잠꼬대'],
+  ['4세트 · 웃긴 그림 2','바닥 깔끔히 청소','바나나 하트 자동차 거미 왕관 피자 오리 캥거루 낙타 유령 인어 코딱지 배꼽 모기 미끄럼틀 화산 감기 물구나무 딸꾹질'],
+  ['5세트 · 겨울','모둠원 모두 펭귄처럼 뒤뚱뒤뚱 교실 한 바퀴 걷기','썰매 장갑 펭귄 산타 루돌프 굴뚝 고드름 목도리 군고구마 붕어빵 스키 크리스마스트리 눈싸움 호빵 이글루 귀마개 북극곰 선물상자 핫초코'],
+  ['6세트 · 학교생활',"모둠원 모두 차렷, 경례! 하고 '감사합니다' 외치기",'칠판 급식 시소 책가방 지우개 리코더 현미경 줄넘기 실내화 시간표 크레파스 교장선생님 받아쓰기 운동회 숙제 소풍 방학 지각 짝꿍'],
+  ['7세트 · 직업',"모둠원 모두 소방관처럼 한 줄로 서서 '출동!' 외치기",'소방관 의사 경찰 요리사 우주비행사 택배기사 미용사 농부 마술사 가수 화가 축구선수 사진작가 해적 기자 과학자 발레리나 유튜버 닌자'],
+  ['8세트 · 음식',"모둠원 모두 '잘 먹겠습니다!' 외치고 배 두드리기",'떡볶이 김밥 라면 햄버거 수박 치킨 아이스크림 도넛 핫도그 짜장면 계란후라이 팝콘 솜사탕 삼각김밥 포도 탕후루 케이크 초밥 방울토마토']
+];
+
+(function(){
+const app = document.getElementById('app'), overlay = document.getElementById('overlay'), tabsEl = document.getElementById('tabs');
+document.getElementById('brand').innerHTML = BRAND_SVG + ' 릴레이 그리기 · 교사';
+const T = {
+  tab: ls.get('rdt-tab', 'status'), monClass: 'all', showWords: ls.get('rdt-showwords', false),
+  classes: [], sets: [], games: {}, loaded: { classes: false, sets: false, games: false },
+  edit: null, modal: null, target: null
+};
+const hostUrl = id => new URL('./?class=' + encodeURIComponent(id), location.href).href;
+const className = id => (T.classes.find(c => c.id === id) || {}).name || '';
+const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const parseWords = t => t.split(/\n|,/).map(x => x.trim()).filter(Boolean);
+const fail = msg => () => toast(msg);
+
+/* ---------- 로그인 ---------- */
+function renderLogin(){
+  tabsEl.hidden = true; overlay.innerHTML = '';
+  app.innerHTML = `<form class="panel login" id="loginForm"><h2>교사 로그인</h2>
+    <p class="note">릴레이 원고지와 같은 교사 비밀번호예요.</p>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="비밀번호">
+    <button class="btn primary" type="submit" id="loginBtn">입장하기</button></form>`;
+  setTimeout(() => document.getElementById('pw')?.focus(), 50);
+}
+document.addEventListener('submit', async e => {
+  if (e.target.id === 'loginForm') {
+    e.preventDefault();
+    const pw = document.getElementById('pw').value.trim(), btn = document.getElementById('loginBtn');
+    if (!pw) { toast('비밀번호를 입력해 주세요'); return; }
+    btn.disabled = true; btn.textContent = '확인 중…';
+    try {
+      await AUTH.signInWithEmailAndPassword(TEACHER_EMAIL, pw);
+      if (!isTeacher()) { await AUTH.signOut(); throw { code: 'not-teacher' }; }
+    } catch (err) {
+      const c = String(err && err.code || '');
+      toast(/too-many/.test(c) ? '시도가 너무 많아요. 잠시 후 다시 해 주세요.' : /network/.test(c) ? '인터넷 연결을 확인해 주세요' : '비밀번호가 일치하지 않아요');
+      btn.disabled = false; btn.textContent = '입장하기';
+    }
+  }
+  if (e.target.id === 'addClassForm') {
+    e.preventDefault();
+    const inp = document.getElementById('newClass'), name = inp.value.trim(); if (!name) return;
+    const first = T.sets[0];
+    ref('classes/' + newId('c')).set({ name, order: Date.now(), setId: first ? first.id : '', groups: 6, minutes: 10 })
+      .then(() => { inp.value = ''; toast(`'${name}'을(를) 만들었어요`); }, fail('반을 만들지 못했어요'));
+  }
+});
+
+let started = false;
+AUTH.onAuthStateChanged(u => {
+  if (!u || u.uid !== TEACHER_UID) { renderLogin(); return; }
+  if (started) { render(); return; }
+  started = true;
+  ref('classes').on('value', s => { T.classes = listOf(s.val()); T.loaded.classes = true; render(); });
+  ref('sets').on('value', s => { T.sets = listOf(s.val()).map(normSet); T.loaded.sets = true; render(); });
+  ref('games').on('value', s => { const v = s.val() || {}; T.games = {}; Object.keys(v).forEach(k => { T.games[k] = normGame(v[k]); }); T.loaded.games = true; render(); });
+});
+
+/* ---------- 그리기 ---------- */
+function typing(){ const a = document.activeElement; return a && /^(edName|edWords|edMission|newClass|cname-)/.test(a.id); }
+function render(){
+  if (!isTeacher()) return;
+  tabsEl.hidden = false;
+  tabsEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === T.tab));
+  if (!T.loaded.classes || !T.loaded.sets || !T.loaded.games) return;
+  if (T.tab === 'sets' && typing()) { renderOverlay(); return; }
+  if (T.tab === 'classes' && typing()) { renderOverlay(); return; }
+  if (T.tab === 'status') renderStatus();
+  else if (T.tab === 'classes') renderClasses();
+  else renderSets();
+  renderOverlay();
+}
+
+function renderStatus(){
+  if (T.monClass !== 'all' && !className(T.monClass)) T.monClass = 'all';
+  const tabs = `<div class="tabs"><button data-mon="all" aria-current="${T.monClass === 'all'}">전체 반</button>${T.classes.map(c => `<button data-mon="${esc(c.id)}" aria-current="${T.monClass === c.id}">${esc(c.name)}</button>`).join('')}</div>`;
+  app.innerHTML = tabs + (T.monClass === 'all' ? overview() : detail(T.monClass));
+}
+function overview(){
+  if (!T.classes.length) return `<div class="panel empty" style="margin-top:16px"><h2>아직 반이 없어요</h2><p class="note">반 관리에서 반을 만들고, 진행자 링크(또는 QR)를 학생 진행자 태블릿에서 열게 하세요.</p><button class="btn" data-tab="classes">반 관리로</button></div>`;
+  const cards = T.classes.map(c => {
+    const g = T.games[c.id];
+    if (!g || !g.status) return `<button class="ovcard" data-mon="${esc(c.id)}"><div class="ovtop"><div><b>${esc(c.name)}</b><span class="status st-idle">대기</span></div></div><p class="note">학생 진행자가 시작하면 표시돼요.</p></button>`;
+    const ci = clockInfo(g), N = total(g);
+    const rows = Array.from({ length: g.groups }, (_, i) => { const fin = !!g.finishedAt[i], p = g.progress[i];
+      return `<div class="ovrow" style="--gc:${gcolor(i)}"><span>${i + 1}모둠</span><span class="bar"><i style="width:${Math.round(((fin ? N : p) / N) * 100)}%"></i></span><em>${fin ? rankOf(g, i) + '등' : p === N - 1 ? '미션' : (p + 1) + '/' + (N - 1)}</em></div>`; }).join('');
+    return `<button class="ovcard" data-mon="${esc(c.id)}"><div class="ovtop"><div><b>${esc(c.name)}</b><span class="status st-${g.status}">${STATUS[g.status]}</span></div>
+      <span class="ovclock clock ${ci.cls}" data-clock-for="${esc(c.id)}" data-base="ovclock clock">${ci.text}</span></div>
+      <span class="note">${esc(g.setName)}</span>${rows}</button>`;
+  }).join('');
+  return `<div class="ovgrid" style="margin-top:16px">${cards}</div><p class="note">반 카드를 누르면 지금 제시어와 진행 기록까지 자세히 보여요.</p>`;
+}
+function detail(cid){
+  const g = T.games[cid], cname = className(cid);
+  if (!g || !g.status) return `<div class="panel empty" style="margin-top:16px"><h2>${esc(cname)} · 진행 대기 중</h2><p class="note">학생 진행자가 이 반을 고르고 시작을 누르면 모둠별 진행 상황이 실시간으로 나타나요.</p></div>`;
+  const ci = clockInfo(g), N = total(g);
+  const max = Math.max(...g.progress.map((p, i) => g.finishedAt[i] ? N : p));
+  const rows = Array.from({ length: g.groups }, (_, i) => {
+    const p = g.progress[i], fin = !!g.finishedAt[i], score = fin ? N : p;
+    const cells = Array.from({ length: N }, (_, k) => { const ms = k === N - 1, on = fin || k < p, cur = !fin && k === p; return `<i class="${ms ? 'ms' : ''} ${on ? 'on' : ''} ${cur && !ms ? 'cur' : ''}"></i>`; }).join('');
+    const cur = fin ? `<span class="rank">${rankOf(g, i)}등 · 미션 성공</span>` : `${p === N - 1 ? '<span class="mtag">미션</span> ' : ''}<b class="${T.showWords ? '' : 'hidden-word'}">${esc(itemText(g, p))}</b>`;
+    return `<div class="mrow ${score === max && max > 0 ? 'lead' : ''}" style="--gc:${gcolor(i)}"><span class="gname"><span class="dot"></span>${i + 1}모둠</span>
+      <div class="cells" aria-label="${N}개 중 ${score}개 완료">${cells}</div><span class="mcount">${fin ? '완주' : (p + 1)}<small>${fin ? '' : '/' + (N - 1)}</small></span><span class="mword">${cur}</span></div>`;
+  }).join('');
+  const log = g.log.map(l => `<div><time>${new Date(l.t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</time><span>${esc(l.text)}</span></div>`).join('');
+  return `<div class="mon-head" style="margin-top:16px">
+    <div><span class="status st-${g.status}">${STATUS[g.status]}</span><h1 style="font-size:28px;margin-top:6px">${esc(cname)} · ${esc(g.setName)} · ${g.groups}모둠</h1>
+      <p class="note">${g.timerSec ? '제한 ' + g.timerSec / 60 + '분' : '시간 제한 없음'}${ci.over ? ' · 시간 종료' : ''}</p></div>
+    <span class="mon-clock clock ${ci.cls}" data-clock-for="${esc(cid)}" data-base="mon-clock clock">${ci.text}</span></div>
+  <div class="mon-cols"><div class="mon-table">${rows}
+    <label class="toggle"><input type="checkbox" id="showWords" ${T.showWords ? 'checked' : ''}> 현재 제시어 보이기 (화면을 학생에게 띄울 때는 꺼 두세요)</label>
+    <div class="row">${isActive(g) ? `<button class="btn danger" data-act="askstop" data-id="${esc(cid)}">이 반 게임 끝내기</button>` : ''}<button class="btn" data-act="askclear" data-id="${esc(cid)}">기록 지우고 대기로</button></div></div>
+    <section class="panel"><h3 style="font-size:20px">진행 기록</h3><div class="log">${log || '<p class="note">아직 기록이 없어요.</p>'}</div></section></div>`;
+}
+
+function renderClasses(){
+  const setOpts = sel => `<option value="">세트 선택</option>` + T.sets.map(s => `<option value="${esc(s.id)}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  const rows = T.classes.map(c => `<div class="clsrow">
+    <div class="field"><label class="label" for="cname-${esc(c.id)}">반 이름</label><input type="text" id="cname-${esc(c.id)}" data-cname="${esc(c.id)}" value="${esc(c.name)}" maxlength="20"></div>
+    <div class="field"><label class="label" for="cset-${esc(c.id)}">기본 세트</label><select id="cset-${esc(c.id)}" data-cfg="setId" data-id="${esc(c.id)}">${setOpts(c.setId)}</select></div>
+    <div class="field"><label class="label" for="cgrp-${esc(c.id)}">모둠 수</label><select id="cgrp-${esc(c.id)}" data-cfg="groups" data-id="${esc(c.id)}">${Array.from({ length: 11 }, (_, k) => k + 2).map(n => `<option value="${n}" ${n === (c.groups || 6) ? 'selected' : ''}>${n}모둠</option>`).join('')}</select></div>
+    <div class="field"><label class="label" for="cmin-${esc(c.id)}">제한 시간</label><select id="cmin-${esc(c.id)}" data-cfg="minutes" data-id="${esc(c.id)}">${[0, 3, 5, 7, 10, 12, 15, 20, 25, 30].map(m => `<option value="${m}" ${m === (c.minutes ?? 10) ? 'selected' : ''}>${m ? m + '분' : '제한 없음'}</option>`).join('')}</select></div>
+    <div class="row"><button class="btn" data-act="qr" data-id="${esc(c.id)}">진행자 링크</button><button class="btn danger" data-act="askdelclass" data-id="${esc(c.id)}">삭제</button></div>
+  </div>`).join('');
+  app.innerHTML = `<section class="panel"><h2>반 관리</h2>
+    <p class="note">반마다 학생 진행자 태블릿에서 <b>진행자 링크</b>를 열게 하세요. 여기서 정한 세트·모둠 수·시간이 진행자 첫 화면에 미리 골라져 있고, 진행자가 바꿀 수도 있어요.</p>
+    ${rows || '<div class="empty"><h2>아직 반이 없어요</h2><p class="note">아래에 반 이름을 적고 만드세요.</p></div>'}
+    <form class="addrow" id="addClassForm"><input id="newClass" type="text" placeholder="반 이름 (예: 4학년 1반)" maxlength="20"><button class="btn primary" type="submit">반 만들기</button></form>
+    <p class="note">반을 고르는 진행자 화면 주소: <span class="linkline">${esc(new URL('./', location.href).href)}</span></p>
+  </section>`;
+}
+
+function renderSets(){
+  const E = T.edit;
+  const items = T.sets.map(s => `<button data-edset="${esc(s.id)}" aria-current="${!!E && E.id === s.id}">${esc(s.name)}<br><span class="note">${s.words.length}개 + 미션</span></button>`).join('');
+  const n = E ? parseWords(E.wordsText).length : 0;
+  app.innerHTML = `<h2>제시어 세트</h2>
+  ${T.sets.length ? '' : `<div class="banner"><span>세트가 비어 있어요. 기본 8세트(선생님 파일 4세트 + 겨울·학교생활·직업·음식)를 넣을까요?</span><button class="btn primary" data-act="seed">기본 8세트 넣기</button></div>`}
+  <div class="editor">
+    <section class="panel"><div class="edlist">${items || '<p class="note">아직 세트가 없어요.</p>'}</div><button class="btn" data-act="newset">+ 새 세트</button></section>
+    <section class="panel">${E ? `
+      <div class="field"><label class="label" for="edName">세트 이름</label><input id="edName" type="text" value="${esc(E.name)}" placeholder="예: 9세트 · 동물"></div>
+      <div class="field"><label class="label" for="edWords">제시어 (한 줄에 하나, 순서대로) · <span id="edCount">${n}</span>개</label>
+        <textarea id="edWords" placeholder="양궁&#10;송편&#10;수영">${esc(E.wordsText)}</textarea>
+        <p class="note">한글 파일 표에서 복사해 붙여 넣어도 돼요. 번호만 있는 줄은 저장할 때 빠져요.</p></div>
+      <div class="field"><label class="label" for="edMission">마지막 행동 미션</label><input id="edMission" type="text" value="${esc(E.mission)}" placeholder="예: 만세 3번 외치기"></div>
+      <div class="row"><button class="btn primary" data-act="saveset">저장</button>${E.isNew ? '' : `<button class="btn" data-act="dupset">복제</button><button class="btn danger" data-act="askdelset">삭제</button>`}<span class="note" id="edMsg"></span></div>`
+    : `<div class="empty"><h2>세트를 고르세요</h2><p class="note">왼쪽에서 세트를 고르거나 새 세트를 만드세요.</p></div>`}</section>
+  </div>`;
+}
+
+function renderOverlay(){
+  let h = '';
+  const confirmBox = (title, body, act, label) => `<div class="modal"><div class="panel"><h2>${title}</h2><p class="note">${body}</p><div class="row"><button class="btn" data-act="cancel">취소</button><button class="btn danger" data-act="${act}">${label}</button></div></div></div>`;
+  const nm = esc(className(T.target));
+  if (T.modal === 'qr') h = `<div class="modal"><div class="panel"><h2>${nm} 진행자 링크</h2><div class="qrbox" id="qr"></div>
+    <p class="linkline" id="qrLink">${esc(hostUrl(T.target))}</p><div class="row"><button class="btn" data-act="copy">주소 복사</button><button class="btn primary" data-act="cancel">닫기</button></div></div></div>`;
+  if (T.modal === 'delclass') h = confirmBox(`'${nm}'을(를) 지울까요?`, '이 반의 진행 기록도 함께 지워져요.', 'delclass', '삭제');
+  if (T.modal === 'stop') h = confirmBox(`${nm} 게임을 끝낼까요?`, '진행자 태블릿의 타이머가 멈추고 모둠 버튼이 잠겨요.', 'stop', '끝내기');
+  if (T.modal === 'clear') h = confirmBox(`${nm} 기록을 지울까요?`, '진행 상황과 기록이 지워지고, 진행자 화면은 시작 전 화면으로 돌아가요.', 'clear', '지우기');
+  if (T.modal === 'delset') h = confirmBox('이 세트를 지울까요?', `'${esc(T.edit && T.edit.name)}' 세트가 삭제돼요.`, 'delset', '삭제');
+  overlay.innerHTML = h;
+  if (T.modal === 'qr' && window.QRCode) new QRCode(document.getElementById('qr'), { text: hostUrl(T.target), width: 240, height: 240 });
+}
+
+/* ---------- 이벤트 ---------- */
+document.addEventListener('input', e => {
+  const E = T.edit; if (!E) return;
+  if (e.target.id === 'edName') E.name = e.target.value;
+  if (e.target.id === 'edMission') E.mission = e.target.value;
+  if (e.target.id === 'edWords') { E.wordsText = e.target.value; const c = document.getElementById('edCount'); if (c) c.textContent = parseWords(E.wordsText).filter(w => !/^\d+$/.test(w)).length; }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'showWords') { T.showWords = t.checked; ls.set('rdt-showwords', T.showWords); render(); return; }
+  if (t.dataset.cname) { const v = t.value.trim(); if (v) ref('classes/' + t.dataset.cname + '/name').set(v).catch(fail('이름을 바꾸지 못했어요')); return; }
+  if (t.dataset.cfg) { const k = t.dataset.cfg, v = k === 'setId' ? t.value : +t.value; ref('classes/' + t.dataset.id + '/' + k).set(v).catch(fail('저장하지 못했어요')); }
+});
+document.addEventListener('focusout', e => { if (/^(cname-)/.test(e.target.id)) setTimeout(render, 0); });
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tab) { T.tab = b.dataset.tab; ls.set('rdt-tab', T.tab); T.modal = null; render(); return; }
+  if (b.dataset.mon) { T.monClass = b.dataset.mon; render(); return; }
+  if (b.dataset.edset) { const s = T.sets.find(x => x.id === b.dataset.edset); T.edit = { id: s.id, name: s.name, wordsText: s.words.join('\n'), mission: s.mission || '', isNew: false }; renderSets(); return; }
+  const a = b.dataset.act, id = b.dataset.id;
+  if (a === 'cancel') { T.modal = null; render(); }
+  else if (a === 'qr') { T.target = id; T.modal = 'qr'; renderOverlay(); }
+  else if (a === 'copy') { const link = hostUrl(T.target); try { await navigator.clipboard.writeText(link); toast('주소를 복사했어요'); } catch (err) { const r = document.createRange(); r.selectNodeContents(document.getElementById('qrLink')); getSelection().removeAllRanges(); getSelection().addRange(r); toast('주소를 선택했어요. 복사해 주세요'); } }
+  else if (a === 'askdelclass') { T.target = id; T.modal = 'delclass'; renderOverlay(); }
+  else if (a === 'delclass') { T.modal = null; ref('').update({ ['classes/' + T.target]: null, ['games/' + T.target]: null }).catch(fail('반을 지우지 못했어요')); }
+  else if (a === 'askstop') { T.target = id; T.modal = 'stop'; renderOverlay(); }
+  else if (a === 'stop') {
+    T.modal = null; const g = JSON.parse(JSON.stringify(T.games[T.target])), t = now();
+    if (g.pausedAt) { g.pausedTotal += t - g.pausedAt; g.pausedAt = 0; }
+    g.status = 'ended'; g.endedAt = t; g.log = [{ t, text: '선생님이 게임 종료' }, ...g.log].slice(0, 40);
+    ref('games/' + T.target).set(g).catch(fail('끝내지 못했어요'));
+  }
+  else if (a === 'askclear') { T.target = id; T.modal = 'clear'; renderOverlay(); }
+  else if (a === 'clear') { T.modal = null; ref('games/' + T.target).remove().catch(fail('지우지 못했어요')); }
+  else if (a === 'seed') {
+    b.disabled = true; const up = {};
+    DEFAULT_SETS.forEach(([name, mission, words], i) => { up['sets/set' + (i + 1)] = { name, mission, words: words.split(' '), order: i + 1 }; });
+    ref('').update(up).then(() => toast('기본 8세트를 넣었어요'), () => { b.disabled = false; toast('넣지 못했어요. 다시 눌러 주세요'); });
+  }
+  else if (a === 'newset') { T.edit = { id: newId('s'), name: '', wordsText: '', mission: '', isNew: true }; renderSets(); }
+  else if (a === 'dupset') { T.edit = { ...T.edit, id: newId('s'), name: T.edit.name + ' (복사본)', isNew: true }; renderSets(); }
+  else if (a === 'askdelset') { T.modal = 'delset'; renderOverlay(); }
+  else if (a === 'delset') { T.modal = null; const sid = T.edit.id; T.edit = null; ref('sets/' + sid).remove().catch(fail('세트를 지우지 못했어요')); render(); }
+  else if (a === 'saveset') {
+    const E = T.edit, msg = document.getElementById('edMsg'), words = parseWords(E.wordsText).filter(w => !/^\d+$/.test(w) && !/^미션\s*:/.test(w));
+    if (!E.name.trim()) { msg.textContent = '세트 이름을 적어 주세요.'; return; }
+    if (!words.length) { msg.textContent = '제시어를 하나 이상 적어 주세요.'; return; }
+    if (!E.mission.trim()) { msg.textContent = '마지막 행동 미션을 적어 주세요.'; return; }
+    const ex = T.sets.find(s => s.id === E.id);
+    b.disabled = true;
+    try {
+      await ref('sets/' + E.id).set({ name: E.name.trim(), words, mission: E.mission.trim(), order: ex ? ex.order : Date.now() });
+      E.isNew = false; E.wordsText = words.join('\n'); document.activeElement && document.activeElement.blur(); renderSets();
+      const m = document.getElementById('edMsg'); if (m) m.textContent = '저장했어요.';
+    } catch (err) { b.disabled = false; msg.textContent = '저장하지 못했어요. 연결을 확인하고 다시 눌러 주세요.'; }
+  }
+});
+
+startClocks(id => T.games[id]);
+})();
+</script>
+</body>
+</html>

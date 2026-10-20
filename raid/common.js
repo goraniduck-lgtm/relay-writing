@@ -147,7 +147,9 @@ function endingFor(g, grp, escapedCount){
 }
 
 /* 그림: img/ 폴더에 파일이 있으면 보이고, 없으면 조용히 빠짐 */
-const art = (file, cls, alt) => `<img class="art ${cls || ''}" src="img/${file}" alt="${esc(alt || '')}" onerror="this.remove()">`;
+/* 같은 이름의 .webp를 먼저 찾고, 없으면 .png, 둘 다 없으면 그림을 빼고 기본 그림을 보여 줌 */
+const art = (file, cls, alt) => { const base = String(file).replace(/\.(png|webp|jpg)$/, '');
+  return `<img class="art ${cls || ''}" src="img/${base}.webp" alt="${esc(alt || '')}" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='img/${base}.png'}else{this.remove()}">`; };
 
 const DRAGON_SVG = `<svg viewBox="0 0 200 140" class="dragon-fallback" aria-hidden="true"><path d="M20 110c20-6 34-20 44-38-14 4-26 2-36-6 18 0 30-6 40-18-12-2-20-8-24-18 16 6 30 6 42 0 10-18 28-26 48-22-6 4-8 10-6 16 14-2 26 4 34 14-10-2-18 0-24 6 8 10 10 22 6 34 10 4 18 12 22 24-12-6-24-6-34 0-6 14-20 24-38 26 4 6 4 12 0 18-8-8-20-12-34-10-14 2-28-2-40-12z" fill="currentColor"/><circle cx="130" cy="44" r="4" fill="var(--ember)"/></svg>`;
 

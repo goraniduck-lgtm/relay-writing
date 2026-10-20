@@ -306,3 +306,20 @@ th{color:var(--muted);font-weight:400;font-size:13px}
 .zone{color:#fff;min-height:170px}
 .zone .lbl{z-index:2;background:linear-gradient(0deg,#000000d9 30%,#0000);text-shadow:0 1px 3px #000}
 .zone .lbl b{font-weight:700}
+
+/* 삽화가 들어간 자리 */
+.stage .dragon{inset:0;filter:none}
+.stage .dragon .art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;
+  -webkit-mask-image:radial-gradient(ellipse 62% 60% at 50% 42%,#000 55%,transparent 100%);mask-image:radial-gradient(ellipse 62% 60% at 50% 42%,#000 55%,transparent 100%)}
+.stage .dragon .dragon-fallback{position:absolute;left:10%;top:8%;width:80%}
+.stage > .bg .art{opacity:.55}
+.zone .art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 40%;z-index:1;opacity:1}
+.job .pic .art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.portrait{position:relative;width:96px;flex:none;aspect-ratio:3/4;border-radius:14px;overflow:hidden;display:grid;place-items:center;background:var(--c)}
+.portrait .art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.portrait .avatar.lg{width:100%;height:100%;border-radius:0}
+.scene .art{object-fit:cover}
+.stage .dragon .art{inset:3% 8% 20% 8%;width:84%;height:77%;object-fit:contain;object-position:center;
+  -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 62%,transparent 100%);mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 62%,transparent 100%)}
+.zone{min-height:200px}
+.zone .art{object-position:center 30%}

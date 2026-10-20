@@ -1,6 +1,6 @@
 # 삽화 넣는 곳
 
-아래 이름 그대로 PNG 파일을 넣으면 화면에 자동으로 나타납니다. 파일이 없으면 기본 그림(SVG)이나 배경색이 보입니다.
+아래 이름 그대로 WebP(.webp) 또는 PNG 파일을 넣으면 (같은 이름이면 WebP가 먼저) 화면에 자동으로 나타납니다. 파일이 없으면 기본 그림(SVG)이나 배경색이 보입니다.
 
 - 타이틀·배경: title.png · village-bg.png
 - 보스: dragon-1.png · dragon-2.png · dragon-3.png · dragon-down.png

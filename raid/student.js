@@ -560,7 +560,7 @@ function viewAfter(win){
     const sub = JOBS[m.job], mine = hist.filter(h => h.by === m.no && h.k !== 'r');
     const ok = mine.filter(h => h.ok).length, offOk = mine.filter(h => h.ok && DECKS[h.deck] && DECKS[h.deck].sub !== sub).length;
     const adv = ((st[NK(m.no)] || {}).adv) || 0;
-    return `<div class="after" style="--c:${sub ? SUBJ[sub].color : 'var(--night3)'}">${avatar(m.job, 'lg')}<div class="grow"><div class="nm">${sub ? esc(SUBJ[sub].jobName) : '모험가'} · ${m.no}번${m.name ? ' ' + esc(m.name) : ''}</div>
+    return `<div class="after" style="--c:${sub ? SUBJ[sub].color : 'var(--night3)'}"><div class="portrait">${avatar(m.job, 'lg')}${m.job ? art('job-' + m.job + '.png') : ''}</div><div class="grow"><div class="nm">${sub ? esc(SUBJ[sub].jobName) : '모험가'} · ${m.no}번${m.name ? ' ' + esc(m.name) : ''}</div>
       <p>${esc(m.job ? EPILOGUE[m.job][win ? 'win' : 'lose'] : '')}</p>
       <div class="statchips"><span>미션 성공 <b>${ok}</b></span><span>봉인 <b>${sealCount(g, m.no)}</b>칸</span><span>전공 밖 성공 <b>${offOk}</b></span><span>전문가 조언 <b>${adv}</b></span></div></div></div>`;
   }).join('')}</div>`;

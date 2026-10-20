@@ -323,3 +323,11 @@ th{color:var(--muted);font-weight:400;font-size:13px}
   -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 62%,transparent 100%);mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 62%,transparent 100%)}
 .zone{min-height:200px}
 .zone .art{object-position:center 30%}
+/* 새 용 그림(16:9, 남색 배경): 무대 폭을 꽉 채우고 가장자리만 부드럽게 */
+.stage .dragon .art{inset:4% -6% 22% -6%;width:112%;height:74%;object-fit:contain;object-position:center;
+  -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 72%,transparent 100%);mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 72%,transparent 100%)}
+.stage{background:#151a2e}
+.stage > .bg .art{opacity:.8;-webkit-mask-image:linear-gradient(to bottom,transparent 0%,transparent 38%,#000 72%);mask-image:linear-gradient(to bottom,transparent 0%,transparent 38%,#000 72%)}
+.stage .dragon .art{inset:auto;left:-8%;top:6%;width:116%;height:auto;aspect-ratio:16/9;object-fit:cover;
+  -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 62%,transparent 96%);mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 62%,transparent 96%)}
+.stage .dragon:has(.art) .dragon-fallback{display:none}

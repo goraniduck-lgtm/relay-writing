@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>그림자 용 레이드 · 인쇄물</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<script src="questions.js"></script>
+<style>
+  body{font-family:"Gowun Dodum",sans-serif;margin:0;padding:16px;color:#222;background:#fff}
+  h1,h2,.disp{font-family:"Jua",sans-serif;font-weight:400}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .bar button{font:inherit;padding:10px 18px;border-radius:10px;border:1px solid #999;background:#f6efdf;cursor:pointer}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10mm}
+  .card{border:3px dashed #7a5a1c;border-radius:6mm;padding:8mm;min-height:80mm;display:flex;flex-direction:column;gap:5mm;break-inside:avoid;background:#fffaf0}
+  .card .lbl{font-family:"Jua";font-size:28pt;color:#7a5a1c}
+  .card .q{font-size:18pt;line-height:1.5}
+  .card .foot{margin-top:auto;font-size:10pt;color:#888}
+  .env{border:3px solid #1f5a6c;background:#eef8fa}
+  .env .lbl{color:#1f5a6c}
+  @media print{.bar{display:none} body{padding:0} @page{size:A4;margin:12mm}}
+</style>
+</head>
+<body>
+<div class="bar"><h1 style="margin:0">인쇄물</h1><button onclick="print()">인쇄하기</button><span>탐색형 미션 단서 카드와 비밀 통로 봉투 겉면이에요. 단서 카드는 교실 곳곳에 붙여 두세요.</span></div>
+<h2>단서 카드</h2>
+<div class="cards" id="clues"></div>
+<h2 style="margin-top:12mm">비밀 통로 봉투 겉면</h2>
+<label class="bar">모둠 수 <input id="n" type="number" min="1" max="12" value="7" style="font:inherit;width:70px;padding:6px"></label>
+<div class="cards" id="envs"></div>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+document.getElementById('clues').innerHTML = BANK.filter(c => c.type === 'code').map(c => `<div class="card"><div class="lbl">단서 카드 [${esc(c.card)}]</div><div class="q">${esc(c.cardQ)}</div><div class="foot">답을 태블릿에 입력하세요. 카드는 보고 제자리에 두어요.</div></div>`).join('');
+function envs(){ const n = +document.getElementById('n').value || 1;
+  document.getElementById('envs').innerHTML = Array.from({ length: n }, (_, i) => `<div class="card env"><div class="lbl">비밀 통로 · ${i + 1}모둠</div><div class="q">여기까지 온 모험단만 열 수 있어요.<br>태블릿에 나온 마지막 미션을 모둠원 모두 함께 해내세요!</div><div class="foot">그림자 용 레이드</div></div>`).join(''); }
+document.getElementById('n').addEventListener('input', envs); envs();
+</script>
+</body>
+</html>

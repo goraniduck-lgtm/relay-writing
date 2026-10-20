@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>그림자 용 레이드 · 교사</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="questions.js"></script>
+<script src="common.js"></script>
+</head>
+<body class="teacher">
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">그림자 용 레이드 · 교사</div>
+    <div class="tabs" id="tabs" hidden>
+      <button data-tab="run">진행</button><button data-tab="classes">반 관리</button><button data-tab="records">기록</button>
+    </div>
+  </div>
+  <main id="app"><div class="panel"><h2>연결하는 중</h2></div></main>
+</div>
+<div id="overlay"></div>
+<script>
+(function(){
+const app = document.getElementById('app'), overlay = document.getElementById('overlay'), tabsEl = document.getElementById('tabs');
+const T = { tab: ls.get('raidt-tab', 'run'), cid: ls.get('raidt-class', null), classes: [], games: {}, loaded: false, modal: null, maxDraft: '' };
+const cls = () => T.classes.find(c => c.id === T.cid);
+const game = () => T.games[T.cid] || {};
+const gp = gi => `games/${T.cid}/groups/${GK(gi)}`;
+const studentUrl = id => new URL('./?class=' + encodeURIComponent(id), location.href).href;
+const tvUrl = id => new URL('./tv.html?class=' + encodeURIComponent(id), location.href).href;
+
+/* ---------- 로그인 ---------- */
+function renderLogin(){
+  tabsEl.hidden = true;
+  app.innerHTML = `<form class="parch" id="loginForm" style="max-width:420px;margin:40px auto"><h2>교사 로그인</h2><p class="note">릴레이 원고지와 같은 교사 비밀번호예요.</p>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="비밀번호"><button class="btn gold" id="loginBtn">입장하기</button></form>`;
+  setTimeout(() => document.getElementById('pw')?.focus(), 50);
+}
+document.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (e.target.id === 'loginForm') {
+    const pw = document.getElementById('pw').value.trim(), btn = document.getElementById('loginBtn');
+    if (!pw) return; btn.disabled = true; btn.textContent = '확인 중…';
+    try { await AUTH.signInWithEmailAndPassword(TEACHER_EMAIL, pw); if (!isTeacher()) { await AUTH.signOut(); throw 0; } }
+    catch (err) { toast('비밀번호가 일치하지 않아요'); btn.disabled = false; btn.textContent = '입장하기'; }
+  } else if (e.target.id === 'addClass') {
+    const f = e.target, name = f.cname.value.trim(), groups = Math.max(1, Math.min(12, +f.cgroups.value || 6));
+    if (!name) { toast('반 이름을 써 주세요'); return; }
+    const id = newId('c');
+    await ref('classes/' + id).set({ name, groups, maxNo: 30, hpPerGroup: 25, order: Date.now() }).catch(fail());
+    T.cid = id; ls.set('raidt-class', id); toast('반을 만들었어요'); render();
+  }
+});
+
+/* ---------- 데이터 ---------- */
+let subs = [];
+function start(){
+  tabsEl.hidden = false;
+  subs.forEach(f => f()); subs = [];
+  const c1 = ref('classes'), c2 = ref('games');
+  c1.on('value', s => { T.classes = listOf(s.val()); if (!cls() && T.classes[0]) T.cid = T.classes[0].id; T.loaded = true; render(); });
+  c2.on('value', s => { T.games = s.val() || {}; render(); });
+  subs.push(() => c1.off(), () => c2.off());
+}
+AUTH.onAuthStateChanged(u => { if (u && isTeacher()) start(); else renderLogin(); });
+
+/* ---------- 진행 동작 ---------- */
+function setStatus(st){
+  const g = game(), c = cls(), up = { status: st };
+  if (st !== 'lobby' && !g.bossMax) {
+    const max = (c.groups || 1) * (c.hpPerGroup || 25);
+    up.bossMax = max; up.bossHp = max;
+  }
+  groupsOf(g, c).forEach(gr => { if (gr.energy == null) up[`groups/${GK(gr.gi)}/energy`] = 5; });
+  if (st === 'act3') groupsOf(g, c).forEach(gr => { if (!gr.path && membersOf(gr).length) up[`groups/${GK(gr.gi)}/path`] = 'fight'; });
+  ref('games/' + T.cid).update(up).then(() => toast(STATUS[st] + '(으)로 바꿨어요')).catch(fail());
+}
+function hpAdd(n){ ref(`games/${T.cid}/bossHp`).set(INC(n)).catch(fail()); }
+function setMax(){
+  const g = game(), v = Math.round(+T.maxDraft); if (!(v > 0)) { toast('숫자를 써 주세요'); return; }
+  const dealt = (g.bossMax || 0) - (g.bossHp == null ? g.bossMax || 0 : g.bossHp);
+  ref('games/' + T.cid).update({ bossMax: v, bossHp: v - dealt }).then(() => { T.maxDraft = ''; toast('최대 HP를 바꿨어요'); }).catch(fail());
+}
+function pattern(type, sub){
+  const g = game(), c = cls(), t = now(), up = {};
+  if (type === 'roar') {
+    const recent = Object.values(g.roarUsed || {});
+    const pool = ROAR.filter(q => !recent.includes(q.id)); const q = pick(pool.length ? pool : ROAR);
+    up.roar = { id: newId('r'), qid: q.id, at: t, until: t + MS_ROAR };
+    up.roarUsed = [...recent, q.id].slice(-(ROAR.length - 1));
+  } else {
+    up.pattern = { type, at: t, until: t + PATTERNS[type].ms, sub: sub || null };
+    groupsOf(g, c).forEach(gr => {
+      if (type === 'tail') up[`groups/${GK(gr.gi)}/fx/offline`] = true;
+      if (type === 'wind') up[`groups/${GK(gr.gi)}/fx/force`] = sub;
+    });
+  }
+  T.modal = null;
+  ref('games/' + T.cid).update(up).then(() => toast((PATTERNS[type].name) + ' 발동!')).catch(fail());
+}
+function grpUpdate(gi, up){ ref(gp(gi)).update(up).catch(fail()); }
+function energy(gi, d){ ref(gp(gi) + '/energy').transaction(cur => Math.max(0, Math.min(MAX_ENERGY, (cur == null ? 5 : cur) + d))).catch(fail()); }
+function skipTurn(gi){
+  const gr = game().groups && game().groups[GK(gi)] || {}, ms = membersOf(gr); if (!ms.length) return;
+  const i = ms.findIndex(m => m.no === gr.turn); grpUpdate(gi, { mission: null, turn: ms[(i + 1) % ms.length].no, last: '선생님이 차례를 넘겼어요' });
+}
+function resetGame(all){
+  const g = game(), c = cls(), up = { status: 'lobby', bossMax: null, bossHp: null, pattern: null, roar: null, roarUsed: null, feed: null, stats: null, locks: null };
+  groupsOf(g, c).forEach(gr => {
+    const k = 'groups/' + GK(gr.gi);
+    if (all) up[k] = null;
+    else Object.assign(up, { [k + '/energy']: 5, [k + '/seals']: null, [k + '/used']: null, [k + '/mission']: null, [k + '/fx']: null, [k + '/path']: null,
+      [k + '/votes']: null, [k + '/final']: null, [k + '/done']: null, [k + '/dmg']: null, [k + '/okCount']: null, [k + '/fightTries']: null,
+      [k + '/retreat']: null, [k + '/trapUntil']: null, [k + '/turn']: null, [k + '/last']: null, [k + '/locks']: null });
+  });
+  T.modal = null;
+  ref('games/' + T.cid).update(up).then(() => toast(all ? '모두 지웠어요' : '진행을 처음으로 되돌렸어요')).catch(fail());
+}
+
+/* ---------- 통계 ---------- */
+function subjRate(stats){
+  const out = {}; SUBJ_KEYS.forEach(s => out[s] = { o: 0, x: 0 });
+  Object.values(stats || {}).forEach(st => Object.entries((st && st.d) || {}).forEach(([deck, v]) => {
+    const s = DECKS[deck] && DECKS[deck].sub; if (!s) return; out[s].o += v.o || 0; out[s].x += v.x || 0;
+  }));
+  return out;
+}
+const pct = v => v.o + v.x ? Math.round(v.o / (v.o + v.x) * 100) + '%' : '-';
+
+/* ---------- 화면 ---------- */
+function render(){
+  if (!isTeacher()) return;
+  const ae = document.activeElement;
+  if (ae && (ae.dataset && ae.dataset.field || ae.tagName === 'SELECT' || ae.id === 'maxIn')) { T.pending = true; return; }
+  T.pending = false;
+  tabsEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === T.tab));
+  if (!T.loaded) return;
+  const classChips = `<div class="row">${T.classes.map(c => `<button class="btn ${c.id === T.cid ? 'gold' : ''}" style="min-height:44px;font-size:17px" data-act="pickClass" data-id="${esc(c.id)}">${esc(c.name)}</button>`).join('')}</div>`;
+  if (T.tab === 'classes') app.innerHTML = viewClasses();
+  else if (!T.classes.length) app.innerHTML = `<div class="panel"><h2>먼저 반을 만들어 주세요</h2><button class="btn gold" data-act="tab" data-tab="classes">반 관리로</button></div>`;
+  else app.innerHTML = classChips + (T.tab === 'records' ? viewRecords() : viewRun());
+  overlay.innerHTML = viewModal();
+  document.querySelectorAll('[data-qr]').forEach(el => { if (window.QRCode) new QRCode(el, { text: el.dataset.qr, width: 140, height: 140 }); });
+}
+function viewRun(){
+  const g = game(), c = cls(), st = g.status || 'lobby', max = g.bossMax || 0, hp = g.bossHp == null ? max : g.bossHp;
+  const rates = subjRate(g.stats), weakest = SUBJ_KEYS.filter(s => rates[s].o + rates[s].x).sort((a, b) => rates[a].o / (rates[a].o + rates[a].x) - rates[b].o / (rates[b].o + rates[b].x))[0];
+  const fogOn = g.pattern && g.pattern.type === 'fog' && now() < g.pattern.until;
+  return `<div class="panel"><div class="row"><h2 class="grow">${esc(c.name)} · ${esc(STATUS[st])}</h2><a class="btn" href="${esc(tvUrl(c.id))}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-grid;place-items:center">TV 화면 열기</a></div>
+      <div class="steps">${STATUS_ORDER.map(s => `<button data-act="status" data-s="${s}" aria-pressed="${s === st}">${esc(STATUS[s])}</button>`).join('')}</div>
+      <p class="note">1막을 시작하면 보스 HP가 모둠 수 × ${c.hpPerGroup || 25}로 정해져요. 3막에 들어갈 때 길을 정하지 않은 모둠은 토벌의 길로 들어가요.</p></div>
+    <div class="layout" style="grid-template-columns:minmax(0,1fr) 340px">
+      <div class="panel"><div class="row"><h3 class="grow">보스 HP</h3><span class="kpi">${max ? `${Math.max(0, hp)} / ${max}` : '시작 전'}</span></div>
+        ${max ? `<div class="bossbar"><i style="width:${Math.max(0, hp) / max * 100}%"></i><span>${phaseOf(g)}페이즈 · 남은 HP ${Math.round(Math.max(0, hp) / max * 100)}%</span></div>
+        <div class="row"><button class="btn" data-act="hp" data-n="-5">HP -5</button><button class="btn" data-act="hp" data-n="5">HP +5</button><span class="grow"></span>
+          <input id="maxIn" type="number" min="1" placeholder="새 최대 HP" value="${esc(T.maxDraft)}" style="width:130px"><button class="btn" data-act="setMax">최대 HP 바꾸기</button></div>
+        <p class="note">1막이 끝날 때 남은 HP가 80%보다 많으면 낮추고, 50%보다 적으면 올려요. 최대 HP를 바꿔도 지금까지 준 피해는 그대로예요.</p>` : ''}</div>
+      <div class="panel"><h3>용의 패턴</h3>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <button class="btn" data-act="pattern" data-t="fog" ${PLAYING(st) ? '' : 'disabled'}>그림자 안개${fogOn ? ' (진행 중)' : ''}</button>
+          <button class="btn" data-act="pattern" data-t="tail" ${PLAYING(st) ? '' : 'disabled'}>꼬리 휘두르기</button>
+          <button class="btn" data-act="windAsk" ${PLAYING(st) ? '' : 'disabled'}>날개 바람</button>
+          <button class="btn gold" style="font-size:18px" data-act="pattern" data-t="roar" ${PLAYING(st) && !(g.roar && !g.roar.done) ? '' : 'disabled'}>포효 (30초)</button>
+        </div>
+        <p class="note">과목별 정답률: ${SUBJ_KEYS.map(s => `${SUBJ[s].name} ${pct(rates[s])}`).join(' · ')}${weakest ? ` — 날개 바람 추천: <b>${SUBJ[weakest].name}</b>` : ''}</p>
+        ${g.roar ? `<p class="note">마지막 포효: ${g.roar.done ? `정답률 ${Math.round((g.roar.rate || 0) * 100)}% · ${g.roar.ok ? '막아냄' : '실패'}` : '진행 중'}</p>` : ''}</div>
+    </div>
+    <div class="panel"><h3>모둠 현황</h3><div class="tbl-wrap"><table><thead><tr><th>모둠</th><th>모험단</th><th>기력</th><th>봉인</th><th>길</th><th>최종전</th><th>누적 피해</th><th>지금</th><th></th></tr></thead><tbody>
+      ${groupsOf(g, c).map(gr => { const ms = membersOf(gr), trapped = gr.trapUntil && now() < gr.trapUntil;
+        return `<tr><td class="disp" style="font-size:20px">${esc(groupName(c, gr.gi))}</td>
+        <td>${ms.map(m => `<span class="chip" style="margin:2px">${m.no}번${m.name ? ' ' + esc(m.name) : ''} · ${m.job ? SUBJ[JOBS[m.job]].jobName : '?'} · ${sealCount(gr, m.no)}칸 <button data-act="kick" data-gi="${gr.gi}" data-no="${m.no}" style="border:0;background:none;color:var(--bad)" aria-label="${m.no}번 빼기">✕</button></span>`).join('') || '<span class="mini">없음</span>'}</td>
+        <td><span class="kpi" style="font-size:22px">${gr.energy == null ? 5 : gr.energy}</span> <button class="btn" style="min-height:36px;padding:2px 10px" data-act="en" data-gi="${gr.gi}" data-d="1">+1</button>${trapped ? ` <button class="btn" style="min-height:36px;padding:2px 10px" data-act="free" data-gi="${gr.gi}">갇힘 풀기</button>` : ''}</td>
+        <td>${Object.keys(gr.seals || {}).length}/8</td>
+        <td><select data-act="path" data-gi="${gr.gi}" style="min-height:36px;padding:2px 6px"><option value="">-</option><option value="fight" ${gr.path === 'fight' ? 'selected' : ''}>토벌</option><option value="escape" ${gr.path === 'escape' ? 'selected' : ''}>탈출</option></select></td>
+        <td><select data-act="done" data-gi="${gr.gi}" style="min-height:36px;padding:2px 6px"><option value="">미완료</option><option value="fight" ${gr.done === 'fight' ? 'selected' : ''}>토벌 성공</option><option value="escape" ${gr.done === 'escape' ? 'selected' : ''}>탈출 성공</option></select>${gr.path === 'fight' && !gr.done ? `<div class="mini">시도 ${gr.fightTries || 0}/${FIGHT_TRIES}</div>` : ''}</td>
+        <td>${gr.dmg || 0}</td><td class="mini" style="max-width:220px">${trapped ? '갇힘' : esc(gr.last || '')}</td>
+        <td><button class="btn" style="min-height:36px;padding:2px 10px" data-act="skip" data-gi="${gr.gi}">차례 넘기기</button></td></tr>`; }).join('')}
+    </tbody></table></div><p class="note">“차례 넘기기”는 당번 태블릿이 꺼졌거나 미션이 멈췄을 때 써요. 길·최종전 칸은 필요할 때 직접 고칠 수 있어요.</p></div>
+    <div class="panel"><div class="row"><h3 class="grow">처음으로</h3><button class="btn bad" data-act="resetAsk">진행 초기화</button></div><p class="note">모둠·번호·직업은 그대로 두고 보스 HP, 봉인, 기록을 지워요. 모둠까지 지우려면 진행 초기화 창에서 고르세요.</p></div>`;
+}
+function viewClasses(){
+  return `<form class="panel" id="addClass"><h2>새 반 만들기</h2><div class="row"><input name="cname" placeholder="예: 4학년 2반" class="grow"><label class="row">모둠 수 <input name="cgroups" type="number" min="1" max="12" value="7" style="width:90px"></label><button class="btn gold">만들기</button></div></form>
+    ${T.classes.map(c => `<div class="panel"><div class="row"><h2 class="grow">${esc(c.name)}</h2><button class="btn bad" data-act="delAsk" data-id="${esc(c.id)}">반 지우기</button></div>
+      <div class="row" style="align-items:flex-start;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:center"><div data-qr="${esc(studentUrl(c.id))}" style="background:#fff;padding:6px;border-radius:10px"></div><span class="mini">학생 태블릿</span></div>
+        <div class="grow" style="display:flex;flex-direction:column;gap:10px;min-width:260px">
+          <div class="mini">학생 주소 ${esc(studentUrl(c.id))}<br>TV 주소 ${esc(tvUrl(c.id))}</div>
+          <div class="row"><label class="row">반 이름 <input data-field="name" data-id="${esc(c.id)}" value="${esc(c.name)}" style="width:160px"></label>
+            <label class="row">모둠 수 <input data-field="groups" data-id="${esc(c.id)}" type="number" min="1" max="12" value="${c.groups}" style="width:80px"></label>
+            <label class="row">학생 번호 끝 <input data-field="maxNo" data-id="${esc(c.id)}" type="number" min="1" max="40" value="${c.maxNo || 30}" style="width:80px"></label>
+            <label class="row">모둠당 HP <input data-field="hpPerGroup" data-id="${esc(c.id)}" type="number" min="5" max="60" value="${c.hpPerGroup || 25}" style="width:80px"></label></div>
+          <details><summary>모둠 이름과 비밀 통로 봉투 위치</summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            ${Array.from({ length: c.groups }, (_, i) => `<div class="row"><input data-field="groupNames" data-gi="${i}" data-id="${esc(c.id)}" value="${esc((c.groupNames || {})[GK(i)] || '')}" placeholder="${i + 1}모둠" style="width:140px"><input data-field="passHints" data-gi="${i}" data-id="${esc(c.id)}" class="grow" value="${esc((c.passHints || {})[GK(i)] || '')}" placeholder="봉투 위치 단서 (예: 책꽂이 맨 아래 칸 파란 상자 뒤)"></div>`).join('')}
+          </div></details>
+        </div></div></div>`).join('')}`;
+}
+function viewRecords(){
+  const g = game(), c = cls(), st = g.stats || {}, where = {};
+  groupsOf(g, c).forEach(gr => membersOf(gr).forEach(m => where[m.no] = { gi: gr.gi, job: m.job, name: m.name }));
+  const rows = Object.entries(st).map(([k, v]) => ({ no: +k.replace(/^n/, ''), ...v })).sort((a, b) => a.no - b.no);
+  const sub = (v, s) => { const r = { o: 0, x: 0 }; Object.entries(v.d || {}).forEach(([d, x]) => { if (DECKS[d] && DECKS[d].sub === s) { r.o += x.o || 0; r.x += x.x || 0; } }); return r; };
+  return `<div class="panel"><div class="row"><h2 class="grow">학생별 기록</h2><button class="btn" data-act="csv" ${rows.length ? '' : 'disabled'}>CSV 내려받기</button></div>
+    <p class="note">맞힌 수/푼 수 (정답률). 전공 외 성공은 자기 전공이 아닌 과목에서 성공한 횟수, 조언은 친구에게 준 전문가 조언 횟수예요. 이 화면은 학생에게 보이지 않아요.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>번호</th><th>모둠</th><th>직업</th>${SUBJ_KEYS.map(s => `<th>${SUBJ[s].name}</th>`).join('')}<th>국어 세부</th><th>전공 외 성공</th><th>조언</th></tr></thead><tbody>
+    ${rows.map(v => { const w = where[v.no] || {};
+      return `<tr><td>${v.no}번 ${esc(w.name || v.name || '')}</td><td>${w.gi != null ? esc(groupName(c, w.gi)) : '-'}</td><td>${w.job ? SUBJ[JOBS[w.job]].jobName : '-'}</td>
+      ${SUBJ_KEYS.map(s => { const r = sub(v, s); return `<td>${r.o + r.x ? `${r.o}/${r.o + r.x} (${pct(r)})` : '-'}</td>`; }).join('')}
+      <td class="mini">${['kor_txt', 'kor_voc', 'kor_sp'].map(d => { const x = (v.d || {})[d] || {}; return `${DECKS[d].name.split(' · ')[1]} ${x.o || 0}/${(x.o || 0) + (x.x || 0)}`; }).join(' · ')}</td>
+      <td>${v.off || 0}</td><td>${v.adv || 0}</td></tr>`; }).join('') || `<tr><td colspan="10" class="note">아직 기록이 없어요.</td></tr>`}</tbody></table></div></div>`;
+}
+function viewModal(){
+  if (T.modal === 'wind') {
+    const rates = subjRate(game().stats);
+    return `<div class="overlay"><div class="parch"><h2>날개 바람 — 다음 미션 과목 정하기</h2><p class="note">정답률이 낮은 과목을 고르면 놀이 안에서 약점 복습이 일어나요.</p>
+      <div class="grid">${SUBJ_KEYS.map(s => `<button class="btn big" style="border:3px solid ${SUBJ[s].color}" data-act="wind" data-s="${s}">${SUBJ[s].name}<br><span class="mini" style="color:var(--inkm)">정답률 ${pct(rates[s])}</span></button>`).join('')}</div>
+      <button class="btn" data-act="close">취소</button></div></div>`;
+  }
+  if (T.modal === 'reset') return `<div class="overlay"><div class="parch"><h2>진행 초기화</h2><p>어떻게 지울까요? 되돌릴 수 없어요.</p><div class="row"><button class="btn bad" data-act="reset" data-all="0">진행만 지우기 (모둠·직업 유지)</button><button class="btn bad" data-act="reset" data-all="1">모둠까지 모두 지우기</button><button class="btn" data-act="close">취소</button></div></div></div>`;
+  if (T.modal && T.modal.del) { const c = T.classes.find(x => x.id === T.modal.del);
+    return `<div class="overlay"><div class="parch"><h2>${esc(c ? c.name : '')} 지우기</h2><p>반과 레이드 기록이 모두 지워져요. 되돌릴 수 없어요.</p><div class="row"><button class="btn bad" data-act="del" data-id="${esc(T.modal.del)}">지우기</button><button class="btn" data-act="close">취소</button></div></div></div>`; }
+  return '';
+}
+
+/* ---------- 이벤트 ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act],[data-tab]'); if (!b || b.disabled) return;
+  if (b.dataset.tab && !b.dataset.act) { T.tab = b.dataset.tab; ls.set('raidt-tab', T.tab); render(); return; }
+  const a = b.dataset.act, gi = b.dataset.gi != null ? +b.dataset.gi : null;
+  if (a === 'tab') { T.tab = b.dataset.tab; ls.set('raidt-tab', T.tab); render(); }
+  else if (a === 'pickClass') { T.cid = b.dataset.id; ls.set('raidt-class', T.cid); render(); }
+  else if (a === 'status') setStatus(b.dataset.s);
+  else if (a === 'hp') hpAdd(+b.dataset.n);
+  else if (a === 'setMax') setMax();
+  else if (a === 'pattern') pattern(b.dataset.t);
+  else if (a === 'windAsk') { T.modal = 'wind'; render(); }
+  else if (a === 'wind') pattern('wind', b.dataset.s);
+  else if (a === 'close') { T.modal = null; render(); }
+  else if (a === 'en') energy(gi, +b.dataset.d);
+  else if (a === 'free') grpUpdate(gi, { trapUntil: null, energy: 2 });
+  else if (a === 'skip') skipTurn(gi);
+  else if (a === 'kick') ref(gp(gi) + '/members/' + NK(+b.dataset.no)).remove().catch(fail());
+  else if (a === 'resetAsk') { T.modal = 'reset'; render(); }
+  else if (a === 'reset') resetGame(b.dataset.all === '1');
+  else if (a === 'delAsk') { T.modal = { del: b.dataset.id }; render(); }
+  else if (a === 'del') { const id = b.dataset.id; T.modal = null; Promise.all([ref('classes/' + id).remove(), ref('games/' + id).remove()]).then(() => toast('지웠어요')).catch(fail()); }
+  else if (a === 'csv') downloadCsv();
+});
+document.addEventListener('change', e => {
+  const el = e.target, a = el.dataset.act;
+  if (a === 'path') grpUpdate(+el.dataset.gi, { path: el.value || null });
+  else if (a === 'done') grpUpdate(+el.dataset.gi, { done: el.value || null });
+  else if (el.dataset.field) {
+    const id = el.dataset.id, f = el.dataset.field;
+    let p = `classes/${id}/${f}`, v = el.value.trim();
+    if (f === 'groupNames' || f === 'passHints') p += '/' + GK(el.dataset.gi);
+    else if (f !== 'name') v = Math.max(1, +v || 1);
+    ref(p).set(v === '' ? null : v).then(() => toast('저장했어요')).catch(fail());
+  }
+});
+document.addEventListener('input', e => { if (e.target.id === 'maxIn') T.maxDraft = e.target.value; });
+document.addEventListener('focusout', () => setTimeout(() => { if (T.pending) render(); }, 0));
+
+function downloadCsv(){
+  const g = game(), c = cls(), st = g.stats || {}, where = {};
+  groupsOf(g, c).forEach(gr => membersOf(gr).forEach(m => where[m.no] = { gi: gr.gi, job: m.job, name: m.name }));
+  const head = ['번호', '이름', '모둠', '직업', ...DECK_KEYS.flatMap(d => [DECKS[d].name + ' 맞힘', DECKS[d].name + ' 틀림']), '전공 외 성공', '조언'];
+  const lines = [head].concat(Object.entries(st).map(([k, v]) => { const no = +k.replace(/^n/, ''), w = where[no] || {};
+    return [no, w.name || v.name || '', w.gi != null ? groupName(c, w.gi) : '', w.job ? SUBJ[JOBS[w.job]].jobName : '',
+      ...DECK_KEYS.flatMap(d => [((v.d || {})[d] || {}).o || 0, ((v.d || {})[d] || {}).x || 0]), v.off || 0, v.adv || 0]; }).sort((a, b) => a[0] - b[0]));
+  const csv = '﻿' + lines.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `레이드기록_${c.name}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* 포효 결과는 TV가 안 켜져 있어도 여기서 처리 */
+setInterval(() => { const g = game(); if (T.cid && g.roar && !g.roar.done) resolveRoar(T.cid, g, cls()); }, 1000);
+})();
+</script>
+</body>
+</html>

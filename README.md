@@ -12,3 +12,13 @@
 - 진행자(학생 태블릿, 로그인 없음): `https://goraniduck-lgtm.github.io/relay-writing/drawing/`
 - 교사(반 관리·제시어 세트·전체 현황): `https://goraniduck-lgtm.github.io/relay-writing/drawing/teacher.html`
 - 데이터는 같은 Firebase 프로젝트의 `relayDrawing/` 아래에 저장 (classes, sets, games)
+
+## 그림자 용 레이드 (`raid/`)
+
+- 학생 태블릿: `https://goraniduck-lgtm.github.io/relay-writing/raid/` (반 → 모둠 → 번호 → 직업)
+- 교실 TV(레이드 화면): `https://goraniduck-lgtm.github.io/relay-writing/raid/tv.html`
+- 교사(진행·반 관리·기록): `https://goraniduck-lgtm.github.io/relay-writing/raid/teacher.html`
+- 인쇄물(단서 카드·봉투 겉면): `https://goraniduck-lgtm.github.io/relay-writing/raid/print.html`
+- 문항: `raid/questions.js` (지금은 예시 문항)
+- 삽화: `raid/img/` 에 정해진 파일 이름으로 넣으면 자동으로 보임 (없으면 기본 배경)
+- 데이터는 같은 Firebase 프로젝트의 `raid/` 아래에 저장 (classes, games)

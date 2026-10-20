@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>그림자 용 레이드 · TV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="questions.js"></script>
+<script src="common.js"></script>
+</head>
+<body class="tv">
+<div id="app"><div class="panel"><h2>연결하는 중</h2></div></div>
+<div id="over"></div>
+<div id="fx" style="position:fixed;left:6%;top:12%;width:46%;height:50%;pointer-events:none;z-index:30"></div>
+<script>
+(function(){
+const app = document.getElementById('app'), over = document.getElementById('over');
+const params = new URLSearchParams(location.search);
+const T = { cid: params.get('class'), classes: [], loaded: false, game: null, phase: null, phaseAt: 0, feedStart: Date.now(), viewKey: '' };
+let gameRef = null, feedRef = null;
+const cls = () => T.classes.find(c => c.id === T.cid);
+const studentUrl = () => new URL('./?class=' + encodeURIComponent(T.cid), location.href).href;
+
+function watch(){
+  if (gameRef) gameRef.off(); if (feedRef) feedRef.off();
+  T.game = null; T.phase = null;
+  if (!T.cid) return;
+  gameRef = ref('games/' + T.cid);
+  gameRef.on('value', s => {
+    T.game = s.val() || {};
+    const ph = bossDown(T.game) ? 4 : phaseOf(T.game);
+    if (T.phase != null && ph > T.phase && T.game.status !== 'lobby') T.phaseAt = Date.now();
+    T.phase = ph; render();
+  });
+  feedRef = ref('games/' + T.cid + '/feed').limitToLast(1);
+  feedRef.on('child_added', s => { const f = s.val(); if (f && f.t > now() - 4000) floatDmg(f); });
+}
+function floatDmg(f){
+  document.body.classList.remove('hit'); void document.body.offsetWidth; document.body.classList.add('hit');
+  const d = document.createElement('div'); d.className = 'dmgfloat';
+  d.style.right = (8 + Math.random() * 40) + '%'; d.style.top = (10 + Math.random() * 40) + '%';
+  d.textContent = '-' + f.dmg; if (f.big) d.style.fontSize = '110px';
+  document.getElementById('fx').appendChild(d); setTimeout(() => d.remove(), 1500);
+}
+
+function render(){
+  if (!T.loaded) return;
+  if (!T.cid || !cls()) {
+    app.innerHTML = `<div class="parch" style="max-width:900px;margin:40px auto"><h1>어느 반의 레이드를 띄울까요?</h1><div class="grid">${T.classes.map(c => `<a class="btn big" style="text-decoration:none;color:inherit;display:grid;place-items:center" href="?class=${encodeURIComponent(c.id)}">${esc(c.name)}</a>`).join('') || '<p>교사 화면에서 반을 먼저 만들어 주세요.</p>'}</div></div>`;
+    return;
+  }
+  const g = T.game || {}, c = cls(), st = g.status || 'lobby';
+  const max = g.bossMax || 0, hp = Math.max(0, g.bossHp == null ? max : g.bossHp), ph = phaseOf(g), down = bossDown(g);
+  const dragonImg = down ? 'dragon-down.png' : `dragon-${ph}.png`;
+  app.innerHTML = `<div class="tvwrap">
+    <div class="tvtop"><div class="act">${esc(STATUS[st])}</div><div class="row">${g.pattern && g.pattern.type === 'fog' && now() < g.pattern.until ? `<span class="chip" style="font-size:20px">그림자 안개 <b data-until="${g.pattern.until}"></b></span>` : ''}<span class="chip" style="font-size:20px">${esc(c.name)}</span></div></div>
+    <div class="tvmain">
+      <div class="stage"><div class="bg">${art('village-bg.png')}</div>
+        <div class="dragon">${down ? '' : DRAGON_SVG}${art(dragonImg)}</div>
+        <div class="info"><div class="row"><div class="bossname grow">${down ? '그림자 용이 쓰러졌다!' : '그림자 용'}</div><span class="chip" style="font-size:20px">${down ? '토벌 완료' : ph + '페이즈 · ' + ['', '잠에서 깬 용', '분노한 용', '최후의 발악'][ph]}</span></div>
+          <div class="bossbar"><i style="width:${max ? hp / max * 100 : 100}%"></i><span>${max ? `${hp} / ${max}` : '선생님이 시작하면 HP가 나타나요'}</span></div></div></div>
+      <div class="tvgroups">${st === 'lobby' ? lobbyBox() : ''}${groupsOf(g, c).map(groupCard).join('')}</div>
+    </div></div>`;
+  if (st === 'lobby') { const q = document.getElementById('qr'); if (q && window.QRCode) new QRCode(q, { text: studentUrl(), width: 180, height: 180 }); }
+  over.innerHTML = overlay(g, c);
+}
+function lobbyBox(){
+  return `<div class="tvg" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:18px"><div id="qr" style="background:#fff;padding:8px;border-radius:12px;flex:none"></div><div><div class="nm">태블릿으로 들어와요</div><div style="font-size:18px;color:var(--muted);word-break:break-all">${esc(studentUrl())}</div></div></div>`;
+}
+function groupCard(gr){
+  const ms = membersOf(gr), c = cls();
+  const badge = gr.done ? `<span class="pathbadge done">${gr.done === 'fight' ? '토벌 성공' : '탈출 성공'}</span>` : gr.path ? `<span class="pathbadge ${gr.path}">${gr.path === 'fight' ? '토벌의 길' : '탈출의 길'}</span>` : '';
+  const trapped = gr.trapUntil && now() < gr.trapUntil;
+  const en = gr.energy == null ? 5 : gr.energy;
+  return `<div class="tvg"><div class="top"><span class="nm">${esc(groupName(c, gr.gi))}</span>${badge}<span class="hearts" style="font-size:18px">${Array.from({ length: Math.max(5, en) }, (_, i) => `<span class="${i < en ? '' : 'off'}">♥</span>`).join('')}</span></div>
+    <div class="seals">${SLOTS.map(s => { const v = gr.seals && gr.seals[s.k]; return `<div class="seal ${v != null ? 'on' : ''}" style="--c:${SUBJ[s.sub].color}">${v != null ? `<span class="who">${v}</span>` : `<span>${s.label}</span>`}</div>`; }).join('')}</div>
+    <div class="now">${trapped ? '그림자에 갇혀 쉬는 중…' : esc(gr.last || (ms.length ? ms.map(m => m.no + '번').join(' ') : '아직 아무도 없어요'))}</div>
+    <div class="mini">누적 피해 ${gr.dmg || 0}</div></div>`;
+}
+function overlay(g, c){
+  const t = now(), r = g.roar;
+  if ((g.status || 'lobby') === 'end') return ending(g, c);
+  if (r && !r.done && t < r.until + 3000) {
+    const q = ROAR.find(x => x.id === r.qid) || { q: '', choices: [] };
+    const total = groupsOf(g, c).reduce((n, gr) => n + membersOf(gr).length, 0), n = Object.keys(r.ans || {}).length;
+    return `<div class="tvover"><div class="box"><div class="pimg">${art('pattern-roar.png')}</div><div><h1>용의 포효!</h1><p>${esc(q.q)}</p><p class="count" data-until="${r.until}"></p><p>답한 친구 ${n} / ${total} · 60% 이상 맞히면 막아내요</p></div></div></div>`;
+  }
+  if (r && r.done && t < (r.doneAt || r.until) + 7000) {
+    return `<div class="tvover"><div class="box"><div class="pimg">${art('pattern-roar.png')}</div><div><h1>${r.ok ? '막아냈다!' : '휩쓸렸다…'}</h1><p>정답률 ${Math.round((r.rate || 0) * 100)}%</p><p>${r.ok ? `반격! 용에게 ${DMG.roar} 피해` : '모든 모둠 기력 -1'}</p></div></div></div>`;
+  }
+  const p = g.pattern;
+  if (p && p.type !== 'roar' && t < Math.min(p.until, p.at + 8000)) {
+    return `<div class="tvover"><div class="box"><div class="pimg">${art('pattern-' + p.type + '.png')}</div><div><h1>${esc(PATTERNS[p.type].name)}!</h1><p>${esc(PATTERNS[p.type].text)}</p>${p.type === 'wind' && p.sub ? `<p>다음 미션 과목: <b style="color:var(--gold2)">${esc(SUBJ[p.sub].name)}</b></p>` : ''}</div></div></div>`;
+  }
+  if (Date.now() - T.phaseAt < 6000) {
+    const ph = T.phase;
+    return `<div class="tvover"><div class="box"><div class="pimg">${art(ph === 4 ? 'dragon-down.png' : 'dragon-' + ph + '.png')}</div><div><h1>${ph === 4 ? '용이 쓰러졌다!' : ph === 2 ? '용이 분노했다!' : '최후의 발악!'}</h1><p>${ph === 4 ? '하지만 모험은 끝까지! 남은 미션도 해내요.' : ph === 2 ? '2페이즈 — 꼬리와 날개, 포효를 조심해요.' : '3페이즈 — 마지막 힘을 모아요!'}</p></div></div></div>`;
+  }
+  return '';
+}
+function ending(g, c){
+  const groups = groupsOf(g, c).filter(gr => membersOf(gr).length), win = bossDown(g);
+  const escaped = groups.filter(gr => gr.done === 'escape').length;
+  return `<div class="tvend"><div class="hero"><div class="endimg">${art(win ? 'ending-victory.png' : 'ending-sleep.png')}</div>
+    <div><h1 style="font-size:64px;color:var(--gold2)">${win ? '마을이 해방되었다!' : '그림자 용은 다시 잠들었다…'}</h1><p style="font-size:28px">${win ? '우리 반 모험단이 힘을 모아 그림자 용을 쓰러뜨렸어요.' : '용은 깊은 상처를 입고 물러났어요. 다음 모험을 약속해요!'}</p></div></div>
+    <div class="endgrid">${groups.map(gr => { const e = endingFor(g, gr, escaped); return `<div class="ecard"><div class="mini" style="color:#6b604a">${esc(groupName(c, gr.gi))} · 누적 피해 ${gr.dmg || 0}</div><h3>${esc(e.title)}</h3>${e.extra ? `<div class="extra">${esc(e.extra)}</div>` : ''}</div>`; }).join('')}</div></div>`;
+}
+
+setInterval(() => {
+  const t = now();
+  document.querySelectorAll('[data-until]').forEach(el => { const left = +el.dataset.until - t; el.textContent = left > 60000 ? fmt(left) : Math.max(0, Math.ceil(left / 1000)); });
+  const g = T.game; if (!g || !T.cid) return;
+  if (g.roar && !g.roar.done) resolveRoar(T.cid, g, cls());
+  const r = g.roar, p = g.pattern;
+  const key = [r && !r.done && t < r.until + 3000, r && r.done && t < (r.doneAt || r.until) + 7000, p && t < Math.min(p.until, p.at + 8000), p && t < p.until, Date.now() - T.phaseAt < 6000,
+    groupsOf(g, cls()).map(gr => gr.trapUntil && t < gr.trapUntil).join('')].join();
+  if (key !== T.viewKey) { T.viewKey = key; render(); }
+}, 300);
+
+ensureAnon().then(() => {
+  ref('classes').on('value', s => { T.classes = listOf(s.val()); T.loaded = true; render(); });
+  watch();
+}).catch(() => { app.innerHTML = '<div class="panel"><h2>연결하지 못했어요</h2></div>'; });
+})();
+</script>
+</body>
+</html>

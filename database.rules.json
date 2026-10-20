@@ -36,6 +36,14 @@
           ".write": "auth != null && root.child('relayDrawing/classes/' + $cid).exists()"
         }
       }
+    },
+    "raid": {
+      ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'",
+      "games": {
+        "$cid": {
+          ".write": "auth != null && root.child('raid/classes/' + $cid).exists()"
+        }
+      }
     }
   }
 }

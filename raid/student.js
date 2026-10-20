@@ -12,7 +12,7 @@ const S = {
   no: saved && (!urlClass || saved.cid === urlClass) ? saved.no : null,
   game: null, gameLoaded: false,
   pickGi: null, pickNo: null, nameDraft: '',
-  choice: null, draft: '', mid: null, viewKey: '', modal: null
+  choice: null, draft: '', mid: null, viewKey: '', modal: null, endTab: 'story', endPage: 0, retry: {}, retryDraft: {}
 };
 let gameRef = null;
 
@@ -129,9 +129,11 @@ function drawMission(deck){
 }
 
 /* ---------- 결과 처리 ---------- */
+const logHist = (cardId, deck, by, ok, k) => gref('hist').push({ t: now(), card: cardId, deck, by, ok: ok ? 1 : 0, k });
 async function resolve(ok){
   const m = grp().mission; if (!m || m.state !== 'open') return;
   if (!(await claim(`${gpath()}/locks/${m.id}`))) return;
+  logHist(m.card, m.deck, m.by, ok, 'm');
   const by = m.by, sub = DECKS[m.deck].sub, major = JOBS[jobOf(by)] === sub;
   const st = `games/${S.cid}/stats/${NK(by)}`;
   if (ok) {
@@ -193,6 +195,7 @@ function startReview(){
 async function answerReview(ok){
   const m = grp().mission; if (!m || m.state !== 'review') return;
   if (!(await claim(`${gpath()}/locks/rv_${m.id}`))) return;
+  const rc = card(m.rq); if (rc) logHist(rc.id, rc.deck, m.by, ok, 'r');
   gref('mission/state').set(ok ? 'reviewOk' : 'reviewNg').catch(fail());
   ref(`games/${S.cid}/stats/${NK(m.by)}`).update({ ['d/' + m.deck + (ok ? '/o' : '/x')]: INC(1) });
   if (ok) energyAdd(1);
@@ -209,17 +212,17 @@ function submitReview(){
 async function vote(v){
   await gref('votes/' + NK(S.no)).set(v).catch(fail());
 }
+/* 많이 고른 길로. 같으면 한 번 다시 투표하고, 또 같으면 주사위(홀수 토벌, 짝수 탈출) */
 async function settleVotes(){
-  const g = grp(), ms = membersOf(g), votes = g.votes || {};
-  if (g.path || !ms.length || !ms.every(m => votes[NK(m.no)])) return;
-  if (!(await claim(`${gpath()}/locks/cross`))) return;
+  const g = grp(), ms = membersOf(g), votes = g.votes || {}, round = g.voteRound || 1;
+  if (g.path || g.dice || !ms.length || !ms.every(m => votes[NK(m.no)])) return;
+  if (!(await claim(`${gpath()}/locks/cross_r${round}`))) return;
   const f = ms.filter(m => votes[NK(m.no)] === 'fight').length, e = ms.length - f;
-  let path = f > e ? 'fight' : e > f ? 'escape' : null;
-  if (!path) {
-    const min = Math.min(...ms.map(m => sealCount(g, m.no)));
-    path = votes[NK(ms.find(m => sealCount(g, m.no) === min).no)];
-  }
-  gref().update({ path, last: path === 'fight' ? '토벌의 길을 골랐어요' : '탈출의 길을 골랐어요' }).catch(fail());
+  const pathOf = p => ({ path: p, last: p === 'fight' ? '토벌의 길을 골랐어요' : '탈출의 길을 골랐어요' });
+  if (f !== e) { gref().update(pathOf(f > e ? 'fight' : 'escape')).catch(fail()); return; }
+  if (round === 1) { gref().update({ votes: null, voteRound: 2, last: '동점! 다시 투표해요' }).catch(fail()); return; }
+  const face = 1 + Math.floor(Math.random() * 6), p = face % 2 ? 'fight' : 'escape';
+  gref().update({ dice: { face, at: now() }, ...pathOf(p), last: `주사위 ${face}! ${p === 'fight' ? '토벌' : '탈출'}의 길로` }).catch(fail());
 }
 
 /* ---------- 최종전 ---------- */
@@ -238,7 +241,9 @@ function startFight(){
 }
 function fightAnswer(ok){
   const f = grp().final; if (!f) return;
-  gref('final/ans/' + NK(S.no)).transaction(cur => cur == null ? (ok ? 1 : 0) : undefined).catch(fail());
+  gref('final/ans/' + NK(S.no)).transaction(cur => cur == null ? (ok ? 1 : 0) : undefined).then(r => {
+    const c = card((f.assign || {})[NK(S.no)]); if (r.committed && c) logHist(c.id, c.deck, S.no, ok, 'f');
+  }).catch(fail());
 }
 async function settleFight(){
   const g = grp(), f = g.final; if (!f || f.kind !== 'fight' || f.result) return;
@@ -295,7 +300,7 @@ function roarAnswer(i){
    ========================================================= */
 const avatar = (job, extra) => {
   const sub = JOBS[job];
-  return `<div class="avatar ${extra || ''}" style="--c:${sub ? SUBJ[sub].color : 'var(--night3)'}">${sub ? esc(SUBJ[sub].jobName[0]) : '?'}${job ? art('job-' + job + '.png') : ''}</div>`;
+  return `<div class="avatar ${extra || ''}" style="--c:${sub ? SUBJ[sub].color : 'var(--night3)'}">${sub ? JOB_ICON[job] : '?'}</div>`;
 };
 const hearts = n => `<span class="hearts" aria-label="기력 ${n}">${Array.from({ length: Math.max(5, n) }, (_, i) => `<span class="${i < n ? '' : 'off'}">♥</span>`).join('')}</span>`;
 function bossBar(){
@@ -358,12 +363,13 @@ function viewJobPick(){
   return `<div class="panel"><h2>나의 직업(전공)을 골라요</h2>
     <p class="note">자신 있는 과목을 골라요. 친구가 그 과목 미션을 할 때 <b>전문가 조언</b>을 해 줄 수 있어요. 전공이 아닌 과목에 성공하면 공격력이 2배예요!</p>
     <div class="jobs">${Object.entries(JOBS).map(([job, sub]) => `<button class="job" data-act="job" data-job="${job}" style="--c:${SUBJ[sub].color}" ${taken[job] ? 'disabled' : ''}>
-      <div class="pic"><span class="glyph">${esc(SUBJ[sub].jobName)}</span>${art('job-' + job + '.png')}</div>
+      <div class="pic"><span class="glyph">${JOB_ICON[job]}</span>${art('job-' + job + '.png')}</div>
       <div class="body"><div class="nm">${esc(SUBJ[sub].jobName)}</div><div class="sub">${esc(SUBJ[sub].name)} 전공 · ${esc(SUBJ[sub].zone)}${taken[job] ? ` · ${taken[job]}번이 골랐어요` : ''}</div></div></button>`).join('')}</div></div>`;
 }
 
 function viewMain(){
   const me = meM(), sub = mySub();
+  if (status() === 'end' || bossDown(G())) return `<div class="parch endwrap">${viewEnding()}</div>`;
   return `<div class="panel hud"><div class="who">${avatar(me.job)}<div style="min-width:0"><div class="disp" style="font-size:22px">${S.no}번${me.name ? ' ' + esc(me.name) : ''} · ${esc(SUBJ[sub].jobName)}</div><div class="note">${esc(SUBJ[sub].name)} 전공</div></div></div>${hearts(energy())}<div style="grid-column:1/-1">${bossBar()}</div></div>
     ${viewBanners()}
     <div class="layout"><div class="parch">${viewAction()}</div><div class="side">${viewSeals()}${viewMembers()}</div></div>`;
@@ -375,30 +381,30 @@ function viewBanners(){
   if (f.offline) out.push(`<div class="banner">다음 미션은 오프라인 미션으로 뽑혀요</div>`);
   if (f.eye) out.push(`<div class="banner">용의 눈 — 다음 미션에 성공하면 피해 2배!</div>`);
   if (f.lamp) out.push(`<div class="banner">이웃의 등불 — 다음 미션에서 다른 모둠 친구 1명에게 힌트를 1번 받을 수 있어요</div>`);
-  if (f.lost) out.push(`<div class="banner">길 잃음 — 다음 당번은 봉인 칸을 가장 적게 채운 친구예요</div>`);
+  if (f.lost) out.push(`<div class="banner">길 잃음 — 다음 길잡이는 봉인 칸을 가장 적게 채운 친구예요</div>`);
   return out.join('');
 }
 function viewSeals(){
   const g = grp();
   return `<div class="panel"><div class="row"><h3 class="grow">봉인 판</h3><span class="note">${Object.keys(g.seals || {}).length}/8</span></div>
     <div class="seals">${SLOTS.map(s => { const v = g.seals && g.seals[s.k];
-      return `<div class="seal ${v != null ? 'on' : ''}" style="--c:${SUBJ[s.sub].color}">${v != null ? `<span class="who">${v}번</span>` : ''}<span>${s.label}</span></div>`; }).join('')}</div>
+      return `<div class="seal ${v != null ? 'on' : ''}" style="--c:${SUBJ[s.sub].color}" title="${s.label}"><span class="ico">${sealIconFor(s.k)}</span>${v != null ? `<span class="who">${v}번</span>` : `<span class="lock">${LOCK_ICON}</span>`}<span class="lbl">${s.label}</span></div>`; }).join('')}</div>
     <p class="note">한 사람 ${sealLimits(membersOf(g).length).min}칸 이상, ${sealLimits(membersOf(g).length).max}칸까지</p></div>`;
 }
 function viewMembers(){
   const g = grp(), t = turnNo(), used = new Set(membersOf(g).map(m => m.job));
   const empty = Object.keys(JOBS).filter(j => !used.has(j));
-  return `<div class="panel"><h3>모험단</h3><div class="members">${membersOf(g).map(m => `<div class="member ${m.no === t ? 'turn' : ''}">${avatar(m.job)}<div class="nm"><div>${m.no}번${m.name ? ' ' + esc(m.name) : ''}${m.no === S.no ? ' (나)' : ''}</div><div class="note">${m.job ? esc(SUBJ[JOBS[m.job]].jobName) : '직업 고르는 중'}${m.no === t ? ' · 당번' : ''}</div></div><span class="cnt">${sealCount(g, m.no)}</span></div>`).join('')}</div>
+  return `<div class="panel"><h3>모험단</h3><div class="members">${membersOf(g).map(m => `<div class="member ${m.no === t ? 'turn' : ''}">${avatar(m.job)}<div class="nm"><div>${m.no}번${m.name ? ' ' + esc(m.name) : ''}${m.no === S.no ? ' (나)' : ''}</div><div class="note">${m.job ? esc(SUBJ[JOBS[m.job]].jobName) : '직업 고르는 중'}${m.no === t ? ' · 길잡이' : ''}</div></div><span class="cnt">${sealCount(g, m.no)}</span></div>`).join('')}</div>
     ${empty.length && membersOf(g).length >= 3 ? `<p class="note">빈 전공: ${empty.map(j => SUBJ[JOBS[j]].name).join(', ')} — 누가 성공해도 공격력 2배</p>` : ''}</div>`;
 }
 
 function viewAction(){
   const g = grp(), st = status();
-  if (st === 'end') return viewEnding();
+  if (st === 'end' || bossDown(G())) return viewEnding();
   if (g.trapUntil && now() < g.trapUntil) return `<div class="trap"><h2>그림자에 갇혔어요!</h2><p>기력이 바닥났어요. 잠시 쉬면 기력 2로 다시 시작해요.</p><div class="timer" data-until="${g.trapUntil}"></div></div>`;
   if (g.trapUntil) { revive(); return `<div class="trap"><h2>그림자에서 빠져나오는 중…</h2></div>`; }
   if (g.final && !g.final.closed) return viewFinal();
-  if (st === 'lobby') return `<div><h2>모험 준비 완료!</h2><p class="note">선생님이 1막을 시작하면 첫 당번(${turnNo() || '-'}번)이 구역을 골라요.</p></div>`;
+  if (st === 'lobby') return `<div><h2>모험 준비 완료!</h2><p class="note">선생님이 1막을 시작하면 첫 길잡이(${turnNo() || '-'}번)가 구역을 골라요.</p></div>`;
   if (st === 'cross') return viewCross();
   const m = g.mission;
   if (m) return viewMission(m);
@@ -406,27 +412,27 @@ function viewAction(){
 }
 function viewZones(){
   const t = turnNo(), f = fx();
-  if (!isMyTurn()) return `<div><h2>${nameOf(t)}이(가) 당번이에요</h2><p class="note">당번이 구역을 고르고 있어요. 함께 의논해 주세요!</p></div>`;
+  if (!isMyTurn()) return `<div><h2>이번 길잡이: ${nameOf(t)}</h2><p class="note">길잡이가 갈 구역을 고르고 있어요. 함께 의논해 주세요!</p></div>`;
   if (S.subPick === 'kor') return `<div class="row"><button class="btn" data-act="subBack">← 구역 다시 고르기</button><h2 class="grow">문자의 탑 · 어느 층으로 갈까요?</h2></div>
-    <div class="subdecks">${['kor_txt', 'kor_voc', 'kor_sp'].map(d => `<button class="btn big" style="border-color:var(--kor)" data-act="deck" data-deck="${d}">${esc(DECKS[d].name.split(' · ')[1])}</button>`).join('')}</div>`;
-  return `<div><h2>내가 당번! 어느 구역으로 갈까요?</h2><p class="note">전공이 아닌 과목에 성공하면 공격력 2배예요.</p></div>
-    <div class="zones">${SUBJ_KEYS.map(k => `<button class="zone" style="--c:${SUBJ[k].color}" data-act="zone" data-sub="${k}" ${f.force && f.force !== k ? 'disabled' : ''}>${art('zone-' + k + '.png')}<div class="lbl"><b>${esc(SUBJ[k].zone)}</b><span>${esc(SUBJ[k].name)}${mySub() === k ? ' · 내 전공' : ' · 공격력 2배'}</span></div></button>`).join('')}</div>
+    <div class="subdecks">${['kor_txt', 'kor_voc', 'kor_sp'].map(d => `<button class="subdeck" data-act="deck" data-deck="${d}"><span class="ico">${SEAL_ICON[d]}</span><span>${esc(DECKS[d].name.split(' · ')[1])}</span></button>`).join('')}</div>`;
+  return `<div><h2>내가 길잡이! 어느 구역으로 갈까요?</h2><p class="note">전공이 아닌 과목에 성공하면 공격력 2배예요.</p></div>
+    <div class="zones">${SUBJ_KEYS.map(k => `<button class="zone" style="--c:${SUBJ[k].color}" data-act="zone" data-sub="${k}" ${f.force && f.force !== k ? 'disabled' : ''}><span class="zart">${ZONE_ART[k]}</span>${art('zone-' + k + '.png')}<div class="lbl"><b>${esc(SUBJ[k].zone)}</b><span>${esc(SUBJ[k].name)}${mySub() === k ? ' · 내 전공' : ' · 공격력 2배'}</span></div></button>`).join('')}</div>
     <button class="btn ghost" data-act="pass" style="align-self:flex-start">차례 넘기기</button>`;
 }
 function viewQuestion(c, interactive, prefix){
   if (c.type === 'choice') return `<div class="choices">${c.choices.map((t, i) => `<button data-act="${prefix}choice" data-i="${i}" aria-pressed="${S.choice === i}" ${interactive ? '' : 'disabled'}>${i + 1}. ${esc(t)}</button>`).join('')}</div>`;
   if (c.type === 'short' || c.type === 'code' || c.type === 'measure') {
-    if (!interactive) return `<p class="note">${c.type === 'measure' ? '당번이 잰 값을 입력해요.' : '당번이 답을 입력해요.'}</p>`;
+    if (!interactive) return `<p class="note">${c.type === 'measure' ? '길잡이가 잰 값을 입력해요.' : '길잡이가 답을 입력해요.'}</p>`;
     return `<div class="row"><input id="${prefix}ans" class="grow" ${c.type === 'measure' ? 'inputmode="decimal"' : ''} placeholder="${c.type === 'measure' ? '숫자만' : '답'}" value="${esc(S.draft)}" autocomplete="off">${c.unit ? `<span class="disp" style="font-size:22px">${esc(c.unit)}</span>` : ''}</div>`;
   }
   return '';
 }
 function viewMission(m){
   const c = card(m.card), d = DECKS[m.deck], sub = d.sub, mine = isMyTurn();
-  const head = `<div class="head"><span class="tag" style="--c:${SUBJ[sub].color}">${esc(d.name)} · ${c.kind === 'off' ? '오프라인' : c.kind === 'ev' ? '이벤트' : '온라인'}</span><span class="note">당번 ${esc(nameOf(m.by))}</span>${m.state === 'open' ? `<span class="timer" data-until="${m.until}"></span>` : ''}</div>`;
+  const head = `<div class="head"><span class="tag" style="--c:${SUBJ[sub].color}">${esc(d.name)} · ${c.kind === 'off' ? '오프라인' : c.kind === 'ev' ? '이벤트' : '온라인'}</span><span class="note">길잡이 ${esc(nameOf(m.by))}</span>${m.state === 'open' ? `<span class="timer" data-until="${m.until}"></span>` : ''}</div>`;
   if (m.state === 'event') {
     const e = EVENTS[c.ev];
-    return `<div class="mission">${head}<div class="result"><div class="big" style="color:#6b3fc4">${esc(e.name)}</div><p class="qtext" style="font-size:24px">${esc(e.text)}</p></div>${mine ? `<button class="btn gold big" data-act="next">다음 당번에게</button>` : ''}</div>`;
+    return `<div class="mission">${head}<div class="result"><div class="big" style="color:#6b3fc4">${esc(e.name)}</div><p class="qtext" style="font-size:24px">${esc(e.text)}</p></div>${mine ? `<button class="btn gold big" data-act="next">다음 길잡이에게</button>` : ''}</div>`;
   }
   if (m.state === 'open') {
     let advice = '';
@@ -444,37 +450,48 @@ function viewMission(m){
       ? (c.type === 'self'
         ? `<div class="row"><button class="btn good big grow" data-act="selfOk">성공!</button><button class="btn bad big" data-act="selfNg">실패</button></div>`
         : `<button class="btn gold big" data-act="submit">정답 확인</button>`)
-      : `<p class="note">답은 당번이 직접! 친구는 힌트만 줄 수 있어요.</p>`;
+      : `<p class="note">답은 길잡이가 직접! 친구는 힌트만 줄 수 있어요.</p>`;
     return `<div class="mission">${head}${m.eye ? '<div class="banner">용의 눈 — 성공하면 피해 2배!</div>' : ''}${m.lamp ? '<div class="banner">이웃의 등불 — 다른 모둠 친구 1명에게 힌트 1번</div>' : ''}<div class="qtext">${esc(c.q)}</div>${extra}${viewQuestion(c, mine, '')}${advice}${actions}</div>`;
   }
   if (m.state === 'ok') {
-    return `<div class="mission">${head}<div class="result ok"><div class="big">성공!</div><p class="qtext" style="font-size:24px">용에게 ${m.dmg} 피해${m.slot ? ' · 봉인 1칸!' : ''}</p>${m.slot ? '' : '<p class="note">이 과목 봉인 칸이 다 찼거나, 이미 최대 칸을 채워서 칸은 늘지 않았어요.</p>'}</div>${mine ? `<button class="btn gold big" data-act="next">다음 당번에게</button>` : ''}</div>`;
+    return `<div class="mission">${head}<div class="result ok"><div class="big">성공!</div><p class="qtext" style="font-size:24px">용에게 ${m.dmg} 피해${m.slot ? ' · 봉인 1칸!' : ''}</p>${m.slot ? '' : '<p class="note">이 과목 봉인 칸이 다 찼거나, 이미 최대 칸을 채워서 칸은 늘지 않았어요.</p>'}</div>${mine ? `<button class="btn gold big" data-act="next">다음 길잡이에게</button>` : ''}</div>`;
   }
   if (m.state === 'ng') {
     const ans = c.type === 'choice' ? `${c.a + 1}. ${c.choices[c.a]}` : c.type === 'measure' ? `${c.min}~${c.max}${c.unit || ''}` : c.a || '';
     return `<div class="mission">${head}<div class="result ng"><div class="big">아쉬워요</div><p>기력 -1</p></div>
       ${c.kind === 'on' || c.type === 'code' || c.type === 'measure' ? `<div class="hintbox"><b>정답</b> ${esc(ans)}${c.explain ? `<br>${esc(c.explain)}` : ''}</div>` : ''}
       <p class="note">배움 회복: 친구에게 풀이 설명을 듣고, 같은 과목 복습 문제를 맞히면 기력 +1!</p>
-      ${mine ? `<div class="row"><button class="btn gold big grow" data-act="review">설명 들었어요 · 복습 문제 풀기</button><button class="btn" data-act="next">다음 당번에게</button></div>` : ''}</div>`;
+      ${mine ? `<div class="row"><button class="btn gold big grow" data-act="review">설명 들었어요 · 복습 문제 풀기</button><button class="btn" data-act="next">다음 길잡이에게</button></div>` : ''}</div>`;
   }
   if (m.state === 'review') {
     const rc = card(m.rq);
-    return `<div class="mission"><div class="head"><span class="tag" style="--c:var(--violet)">배움 회복 · 복습 문제</span><span class="timer" data-until="${m.runtil}"></span></div><div class="qtext">${esc(rc.q)}</div>${viewQuestion(rc, mine, 'r')}${mine ? `<button class="btn gold big" data-act="rsubmit">정답 확인</button>` : '<p class="note">당번이 복습 문제를 풀고 있어요.</p>'}</div>`;
+    return `<div class="mission"><div class="head"><span class="tag" style="--c:var(--violet)">배움 회복 · 복습 문제</span><span class="timer" data-until="${m.runtil}"></span></div><div class="qtext">${esc(rc.q)}</div>${viewQuestion(rc, mine, 'r')}${mine ? `<button class="btn gold big" data-act="rsubmit">정답 확인</button>` : '<p class="note">길잡이가 복습 문제를 풀고 있어요.</p>'}</div>`;
   }
   if (m.state === 'reviewOk' || m.state === 'reviewNg') {
     const ok = m.state === 'reviewOk';
-    return `<div class="mission"><div class="result ${ok ? 'ok' : 'ng'}"><div class="big">${ok ? '회복!' : '다음에 다시!'}</div><p>${ok ? '기력 +1' : '괜찮아요. 다음 차례에 또 도전해요.'}</p></div>${mine ? `<button class="btn gold big" data-act="next">다음 당번에게</button>` : ''}</div>`;
+    return `<div class="mission"><div class="result ${ok ? 'ok' : 'ng'}"><div class="big">${ok ? '회복!' : '다음에 다시!'}</div><p>${ok ? '기력 +1' : '괜찮아요. 다음 차례에 또 도전해요.'}</p></div>${mine ? `<button class="btn gold big" data-act="next">다음 길잡이에게</button>` : ''}</div>`;
   }
   return '';
 }
 
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+const pipsHtml = n => Array.from({ length: 9 }, (_, i) => `<i class="${PIPS[n].includes(i) ? 'on' : ''}"></i>`).join('');
+const dieFace = (n, rolling) => `<div class="die${rolling ? ' rolling' : ''}">${pipsHtml(n)}</div>`;
 function viewCross(){
-  const g = grp(), ms = membersOf(g), votes = g.votes || {}, my = votes[NK(S.no)];
-  if (g.path) return `<div><h2>${g.path === 'fight' ? '토벌의 길' : '탈출의 길'}을 골랐어요!</h2><p class="note">3막이 시작되면 이 길로 최종전에 도전해요.</p></div>`;
-  const opt = (k, nm, desc, c) => `<button class="vote" data-act="vote" data-v="${k}" aria-pressed="${my === k}" style="--c:${c}"><div class="pic">${art('final-' + k + '.png')}</div><div class="body"><div class="nm">${nm}</div><div class="note" style="color:var(--muted)">${desc}</div></div></button>`;
-  return `<div><h2>갈림길 회의</h2><p class="note">모둠원과 의논하고 각자 골라요. 많이 고른 길로 가요. 같으면 봉인 칸을 가장 적게 채운 친구의 선택을 따라요.</p></div>
-    <div class="votes">${opt('fight', '토벌의 길', '봉인 8칸을 모두 채우고 합체 공격! 성공하면 용에게 15 피해', '#b8273b')}${opt('escape', '탈출의 길', '과목마다 1칸 이상 채우고 비밀 통로로 탈출! 성공하면 10 피해', '#1f7a8c')}</div>
-    <p class="note">투표: ${ms.map(m => `${m.no}번 ${votes[NK(m.no)] ? '✓' : '…'}`).join(' · ')}</p>`;
+  const g = grp(), ms = membersOf(g), votes = g.votes || {}, my = votes[NK(S.no)], round = g.voteRound || 1;
+  if (g.dice && now() < g.dice.at + 3200) return `<div class="dicebox"><h2>동점이 두 번! 주사위로 정해요</h2>${dieFace(1, true)}<p class="note">홀수(1·3·5)면 토벌의 길, 짝수(2·4·6)면 탈출의 길</p></div>`;
+  if (g.path) {
+    const o = CROSS_OPTIONS[g.path];
+    return `<div class="dicebox">${g.dice ? `${dieFace(g.dice.face)}<p class="note">주사위 ${g.dice.face} — ${g.dice.face % 2 ? '홀수' : '짝수'}</p>` : ''}<h2>${o.name}을 골랐어요!</h2><p class="note">3막이 시작되면 이 길로 최종전에 도전해요. ${esc(o.goal)}</p></div>`;
+  }
+  const opt = k => { const o = CROSS_OPTIONS[k];
+    return `<button class="vote" data-act="vote" data-v="${k}" aria-pressed="${my === k}" style="--c:${o.color}"><div class="pic">${SCENE_ART[k === 'fight' ? 'strike' : 'tunnel']}${art('final-' + k + '.png')}</div>
+      <div class="body"><div class="nm">${o.name}</div><div class="goal">${esc(o.goal)}</div>
+      <div class="say pro"><b>찬성</b> “${esc(o.pro)}”</div><div class="say con"><b>걱정</b> “${esc(o.con)}”</div></div></button>`; };
+  return `<div><h2>갈림길 회의</h2><p class="note">모둠원과 의논하고 각자 골라요. 많이 고른 길로 가요.</p></div>
+    ${round > 1 ? `<div class="banner warn">동점이라 다시 투표해요! 또 같으면 주사위로 정해요.</div>` : ''}
+    <div class="votes">${opt('fight')}${opt('escape')}</div>
+    <p class="note">투표: ${ms.map(m => `${m.no}번 ${votes[NK(m.no)] ? '✓' : '…'}`).join(' · ')}${my ? ' — 모두 고를 때까지 바꿀 수 있어요' : ''}</p>`;
 }
 function viewPathBox(){
   const g = grp();
@@ -516,13 +533,74 @@ function viewFinal(){
     ${mine.map(p => { const q = CLUES.find(c => c.id === p.q); return `<div class="piece"><span class="tag" style="--c:${SUBJ[p.sub].color}">암호 ${p.pos}번째 자리 · ${SUBJ[p.sub].name}</span><div style="margin-top:8px">${esc(q.q)}</div></div>`; }).join('')}
     <div class="row"><input id="codeIn" class="codein" inputmode="numeric" maxlength="4" placeholder="····" value="${esc(S.draft)}"><button class="btn gold big" data-act="code">통로 열기</button></div></div>`;
 }
+/* ---------- 결말 ---------- */
+function groupHist(){ return Object.values(grp().hist || {}).sort((a, b) => a.t - b.t); }
+function tally(list){ const t = { o: 0, x: 0 }; list.forEach(h => h.ok ? t.o++ : t.x++); return t; }
+const rate = t => t.o + t.x ? t.o / (t.o + t.x) : null;
 function viewEnding(){
-  const g = G(), gr = grp(), esc2 = groupsOf(g, cls()).filter(x => x.done === 'escape').length;
-  const e = endingFor(g, gr, esc2), win = bossDown(g);
-  const img = win ? (e.done === 'escape' ? 'ending-escape.png' : 'ending-victory.png') : (e.done === 'escape' ? 'ending-escape.png' : 'ending-sleep.png');
-  return `<div class="endcard"><div class="endimg">${art(img)}</div><h2 style="font-size:34px">${win ? '그림자 용을 쓰러뜨렸다!' : '용은 아직 살아 있다…'}</h2>
-    <div class="hintbox" style="font-size:22px"><b>우리 모둠: ${esc(e.title)}</b>${e.extra ? `<br><span style="font-size:18px">${esc(e.extra)}</span>` : ''}</div>
-    <p class="note">돌아보기: 내가 도전한 약한 과목, 친구에게 받은 도움, 내가 준 도움을 떠올려 봐요.</p></div>`;
+  const g = G(), gr = grp(), escaped = groupsOf(g, cls()).filter(x => x.done === 'escape').length;
+  const e = endingFor(g, gr, escaped), win = bossDown(g);
+  const tab = S.endTab || 'story';
+  const tabs = [['story', '이야기'], ['after', '후일담'], ['review', '다시 보기']].map(([k, n]) => `<button data-act="endTab" data-t="${k}" aria-pressed="${tab === k}">${n}</button>`).join('');
+  return `<div class="ending"><div class="endhead"><div class="kicker">${win ? '그림자 용을 쓰러뜨렸다!' : '용은 아직 살아 있다…'}</div><h2>우리 모둠: ${esc(e.title)}</h2></div>
+    <div class="tabs endtabs">${tabs}</div>
+    ${tab === 'story' ? viewStory(e, win) : tab === 'after' ? viewAfter(win) : viewReview()}</div>`;
+}
+function viewStory(e, win){
+  const panels = ENDING_PANELS[(win ? 'win-' : 'lose-') + e.done];
+  const i = Math.max(0, Math.min(panels.length - 1, S.endPage || 0)), p = panels[i], last = i === panels.length - 1;
+  return `<div class="story">${sceneArt(p.scene)}<p class="narr">${esc(p.text)}</p>
+    ${last && e.extra ? `<div class="extra">${esc(e.extra)}</div>` : ''}
+    <div class="row storynav"><button class="btn" data-act="endPage" data-d="-1" ${i === 0 ? 'disabled' : ''}>← 앞 장면</button><span class="dots">${panels.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</span>
+      ${last ? `<button class="btn gold" data-act="endTab" data-t="after">후일담 보기 →</button>` : `<button class="btn gold" data-act="endPage" data-d="1">다음 장면 →</button>`}</div></div>`;
+}
+function viewAfter(win){
+  const g = grp(), hist = groupHist(), st = G().stats || {};
+  return `<div class="afters">${membersOf(g).map(m => {
+    const sub = JOBS[m.job], mine = hist.filter(h => h.by === m.no && h.k !== 'r');
+    const ok = mine.filter(h => h.ok).length, offOk = mine.filter(h => h.ok && DECKS[h.deck] && DECKS[h.deck].sub !== sub).length;
+    const adv = ((st[NK(m.no)] || {}).adv) || 0;
+    return `<div class="after" style="--c:${sub ? SUBJ[sub].color : 'var(--night3)'}">${avatar(m.job, 'lg')}<div class="grow"><div class="nm">${sub ? esc(SUBJ[sub].jobName) : '모험가'} · ${m.no}번${m.name ? ' ' + esc(m.name) : ''}</div>
+      <p>${esc(m.job ? EPILOGUE[m.job][win ? 'win' : 'lose'] : '')}</p>
+      <div class="statchips"><span>미션 성공 <b>${ok}</b></span><span>봉인 <b>${sealCount(g, m.no)}</b>칸</span><span>전공 밖 성공 <b>${offOk}</b></span><span>전문가 조언 <b>${adv}</b></span></div></div></div>`;
+  }).join('')}</div>`;
+}
+function viewReview(){
+  const g = grp(), hist = groupHist(), all = tally(hist);
+  const bySub = {}; SUBJ_KEYS.forEach(k => bySub[k] = tally(hist.filter(h => DECKS[h.deck] && DECKS[h.deck].sub === k)));
+  const tried = SUBJ_KEYS.filter(k => bySub[k].o + bySub[k].x);
+  const best = tried.slice().sort((a, b) => rate(bySub[b]) - rate(bySub[a]) || (bySub[b].o + bySub[b].x) - (bySub[a].o + bySub[a].x))[0];
+  const worst = tried.slice().sort((a, b) => rate(bySub[a]) - rate(bySub[b]) || (bySub[b].o + bySub[b].x) - (bySub[a].o + bySub[a].x))[0];
+  const untried = SUBJ_KEYS.filter(k => !tried.includes(k));
+  const pct = r => r == null ? '-' : Math.round(r * 100) + '%';
+  const r = rate(all) || 0;
+  const tiles = `<div class="tiles">
+    <div class="tile"><div class="donut" style="--p:${Math.round(r * 100)}"><span>${pct(rate(all))}</span></div><div class="tl">정답률</div></div>
+    <div class="tile"><div class="big">${all.o + all.x}</div><div class="tl">푼 문제</div></div>
+    <div class="tile"><div class="big">${g.dmg || 0}</div><div class="tl">용에게 준 피해</div></div>
+    <div class="tile"><div class="big">${Object.keys(g.seals || {}).length}<small>/8</small></div><div class="tl">연 봉인</div></div></div>`;
+  const bars = `<div class="panel lite"><h3>과목별 정답률</h3>${SUBJ_KEYS.map(k => { const t = bySub[k], rr = rate(t);
+    return `<div class="barrow"><span class="bl"><span class="ico" style="color:${SUBJ[k].color}">${SEAL_ICON[k === 'kor' ? 'kor_txt' : k]}</span>${SUBJ[k].name}</span><span class="track"><i style="width:${rr == null ? 0 : Math.max(4, rr * 100)}%;background:${SUBJ[k].color}"></i></span><span class="bv">${rr == null ? '도전 안 함' : `${t.o}/${t.o + t.x} · ${pct(rr)}`}</span></div>`; }).join('')}</div>`;
+  const sw = `<div class="swgrid">
+    <div class="sw good"><div class="tl">우리의 강점</div><div class="big">${best ? SUBJ[best].name : '-'}</div><p>${best ? `${bySub[best].o + bySub[best].x}문제 중 ${bySub[best].o}개를 맞혔어요.` : '아직 기록이 없어요.'}</p></div>
+    <div class="sw weak"><div class="tl">더 연습할 과목</div><div class="big">${worst && rate(bySub[worst]) < 1 ? SUBJ[worst].name : '없음!'}</div><p>${worst && rate(bySub[worst]) < 1 ? `${bySub[worst].x}문제를 틀렸어요. 아래에서 다시 풀어 봐요.` : '푼 과목은 모두 맞혔어요. 다음엔 더 어려운 구역에 도전!'}${untried.length ? ` 도전하지 않은 과목: ${untried.map(k => SUBJ[k].name).join(', ')}` : ''}</p></div></div>`;
+  const ms = membersOf(g), maxOk = Math.max(1, ...ms.map(m => hist.filter(h => h.by === m.no && h.ok).length));
+  const contrib = `<div class="panel lite"><h3>누가 어떤 과목을 맞혔을까?</h3>${ms.map(m => { const okh = hist.filter(h => h.by === m.no && h.ok);
+    return `<div class="barrow"><span class="bl">${avatar(m.job, 'sm')}${m.no}번</span><span class="track stack">${SUBJ_KEYS.map(k => { const n = okh.filter(h => DECKS[h.deck] && DECKS[h.deck].sub === k).length; return n ? `<i style="width:${n / maxOk * 100}%;background:${SUBJ[k].color}" title="${SUBJ[k].name} ${n}"></i>` : ''; }).join('')}</span><span class="bv">${okh.length}개</span></div>`; }).join('')}
+    <div class="legend">${SUBJ_KEYS.map(k => `<span><i style="background:${SUBJ[k].color}"></i>${SUBJ[k].name}</span>`).join('')}</div></div>`;
+  const wrongIds = [...new Set(hist.filter(h => !h.ok).map(h => h.card))].filter(id => { const c = card(id); return c && c.type !== 'self' && c.kind !== 'ev'; });
+  const wrong = `<div class="panel lite"><h3>틀린 문제 다시 풀기 <span class="note">${wrongIds.length}문제</span></h3>${wrongIds.length ? wrongIds.map(retryCard).join('') : '<p class="note">틀린 문제가 없어요. 대단해요!</p>'}</div>`;
+  return `<div class="review">${tiles}${bars}${sw}${contrib}${wrong}</div>`;
+}
+function retryCard(id){
+  const c = card(id), d = DECKS[c.deck], R = S.retry[id];
+  const q = c.type === 'code' ? c.cardQ : c.q;
+  let body;
+  if (c.type === 'measure') body = `<p class="note">알맞은 값: ${c.min}~${c.max}${esc(c.unit || '')}. 다시 재어 확인해 봐요.</p>`;
+  else if (c.type === 'choice') body = `<div class="choices sm">${c.choices.map((t, i) => `<button data-act="retry" data-id="${id}" data-i="${i}" aria-pressed="${R && R.i === i}" class="${R ? (i === c.a ? 'right' : R.i === i ? 'wrongpick' : '') : ''}" ${R && R.ok ? 'disabled' : ''}>${i + 1}. ${esc(t)}</button>`).join('')}</div>`;
+  else body = `<div class="row"><input id="rt_${id}" class="grow" placeholder="답" value="${esc((S.retryDraft[id]) || '')}" autocomplete="off" ${R && R.ok ? 'disabled' : ''}><button class="btn" data-act="retryShort" data-id="${id}" ${R && R.ok ? 'disabled' : ''}>확인</button></div>`;
+  const fb = R ? `<div class="hintbox ${R.ok ? 'okbox' : ''}">${R.ok ? '<b>맞았어요!</b> ' : `<b>정답</b> ${esc(c.type === 'choice' ? c.choices[c.a] : c.a)} · `}${esc(c.explain || '')}</div>` : '';
+  return `<div class="retry"><span class="tag" style="--c:${SUBJ[d.sub].color}">${esc(d.name)}</span><div class="rq">${esc(q)}</div>${body}${fb}</div>`;
 }
 
 function viewOverlay(){
@@ -581,10 +659,16 @@ document.addEventListener('click', e => {
   else if (a === 'retreat') retreat();
   else if (a === 'closeModal') { S.modal = null; render(); }
   else if (a === 'roar') roarAnswer(+b.dataset.i);
+  else if (a === 'endTab') { S.endTab = b.dataset.t; S.endPage = 0; render(); window.scrollTo(0, 0); }
+  else if (a === 'endPage') { S.endPage = (S.endPage || 0) + +b.dataset.d; render(); }
+  else if (a === 'retry') { const c = card(b.dataset.id), i = +b.dataset.i; S.retry[c.id] = { i, ok: i === c.a }; render(); }
+  else if (a === 'retryShort') { const c = card(b.dataset.id), v = S.retryDraft[c.id] || ''; if (!v.trim()) { toast('답을 써 주세요'); return; }
+    const ok = c.type === 'code' || c.type === 'short' ? [c.a, ...(c.accept || [])].some(x => norm(x) === norm(v)) : false; S.retry[c.id] = { ok }; render(); }
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'nameIn') S.nameDraft = e.target.value;
   else if (['ans', 'rans', 'fans', 'codeIn'].includes(e.target.id)) S.draft = e.target.value;
+  else if (e.target.id && e.target.id.startsWith('rt_')) S.retryDraft[e.target.id.slice(3)] = e.target.value;
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
@@ -596,6 +680,7 @@ document.addEventListener('keydown', e => {
 /* ---------- 시계: 남은 시간 표시, 시간 초과 처리, 화면 상태 바뀌면 다시 그리기 ---------- */
 setInterval(() => {
   const t = now();
+  document.querySelectorAll('.die.rolling').forEach(el => { el.innerHTML = pipsHtml(1 + Math.floor(Math.random() * 6)); });
   document.querySelectorAll('[data-until]').forEach(el => {
     const left = +el.dataset.until - t; el.textContent = fmt(left);
     el.classList.toggle('low', left < 20000);
@@ -606,7 +691,7 @@ setInterval(() => {
   if (m && m.state === 'review' && t > m.runtil && (m.by === S.no || t > m.runtil + 8000)) answerReview(false);
   if (f && f.kind === 'fight' && !f.result) settleFight();
   if (status() === 'cross') settleVotes();
-  const key = [g.trapUntil && t < g.trapUntil, p && t < p.until, r && !r.done && t < r.until + 3000, r && r.done && t < (r.doneAt || r.until) + 7000].join();
+  const key = [g.dice && t < g.dice.at + 3200, bossDown(G()), g.trapUntil && t < g.trapUntil, p && t < p.until, r && !r.done && t < r.until + 3000, r && r.done && t < (r.doneAt || r.until) + 7000].join();
   if (key !== S.viewKey) { S.viewKey = key; render(); }
 }, 400);
 

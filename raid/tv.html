@@ -4,9 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>그림자 용 레이드 · TV</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
 <link rel="stylesheet" href="style.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -14,6 +11,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="questions.js"></script>
 <script src="common.js"></script>
+<script src="icons.js"></script>
+<script src="story.js"></script>
 </head>
 <body class="tv">
 <div id="app"><div class="panel"><h2>연결하는 중</h2></div></div>
@@ -72,7 +71,7 @@ function render(){
   over.innerHTML = overlay(g, c);
 }
 function lobbyBox(){
-  return `<div class="tvg" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:18px"><div id="qr" style="background:#fff;padding:8px;border-radius:12px;flex:none"></div><div><div class="nm">태블릿으로 들어와요</div><div style="font-size:18px;color:var(--muted);word-break:break-all">${esc(studentUrl())}</div></div></div>`;
+  return `<div class="tvg" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:18px"><div id="qr" style="background:#fff;padding:8px;border-radius:12px;flex:none"></div><div><div class="nm">태블릿으로 들어와요</div><div class="url" style="font-size:18px;color:var(--muted)">${esc(studentUrl())}</div></div></div>`;
 }
 function groupCard(gr){
   const ms = membersOf(gr), c = cls();
@@ -80,13 +79,13 @@ function groupCard(gr){
   const trapped = gr.trapUntil && now() < gr.trapUntil;
   const en = gr.energy == null ? 5 : gr.energy;
   return `<div class="tvg"><div class="top"><span class="nm">${esc(groupName(c, gr.gi))}</span>${badge}<span class="hearts" style="font-size:18px">${Array.from({ length: Math.max(5, en) }, (_, i) => `<span class="${i < en ? '' : 'off'}">♥</span>`).join('')}</span></div>
-    <div class="seals">${SLOTS.map(s => { const v = gr.seals && gr.seals[s.k]; return `<div class="seal ${v != null ? 'on' : ''}" style="--c:${SUBJ[s.sub].color}">${v != null ? `<span class="who">${v}</span>` : `<span>${s.label}</span>`}</div>`; }).join('')}</div>
+    <div class="seals">${SLOTS.map(s => { const v = gr.seals && gr.seals[s.k]; return `<div class="seal ${v != null ? 'on' : ''}" style="--c:${SUBJ[s.sub].color}" title="${s.label}"><span class="ico">${sealIconFor(s.k)}</span>${v != null ? `<span class="who">${v}</span>` : ''}</div>`; }).join('')}</div>
     <div class="now">${trapped ? '그림자에 갇혀 쉬는 중…' : esc(gr.last || (ms.length ? ms.map(m => m.no + '번').join(' ') : '아직 아무도 없어요'))}</div>
     <div class="mini">누적 피해 ${gr.dmg || 0}</div></div>`;
 }
 function overlay(g, c){
   const t = now(), r = g.roar;
-  if ((g.status || 'lobby') === 'end') return ending(g, c);
+  if ((g.status || 'lobby') === 'end' || (bossDown(g) && Date.now() - T.phaseAt > 6000)) return ending(g, c);
   if (r && !r.done && t < r.until + 3000) {
     const q = ROAR.find(x => x.id === r.qid) || { q: '', choices: [] };
     const total = groupsOf(g, c).reduce((n, gr) => n + membersOf(gr).length, 0), n = Object.keys(r.ans || {}).length;
@@ -108,7 +107,7 @@ function overlay(g, c){
 function ending(g, c){
   const groups = groupsOf(g, c).filter(gr => membersOf(gr).length), win = bossDown(g);
   const escaped = groups.filter(gr => gr.done === 'escape').length;
-  return `<div class="tvend"><div class="hero"><div class="endimg">${art(win ? 'ending-victory.png' : 'ending-sleep.png')}</div>
+  return `<div class="tvend"><div class="hero"><div class="endimg" style="aspect-ratio:4/3">${sceneArt(win ? 'celebrate' : 'dragon-sleep')}</div>
     <div><h1 style="font-size:64px;color:var(--gold2)">${win ? '마을이 해방되었다!' : '그림자 용은 다시 잠들었다…'}</h1><p style="font-size:28px">${win ? '우리 반 모험단이 힘을 모아 그림자 용을 쓰러뜨렸어요.' : '용은 깊은 상처를 입고 물러났어요. 다음 모험을 약속해요!'}</p></div></div>
     <div class="endgrid">${groups.map(gr => { const e = endingFor(g, gr, escaped); return `<div class="ecard"><div class="mini" style="color:#6b604a">${esc(groupName(c, gr.gi))} · 누적 피해 ${gr.dmg || 0}</div><h3>${esc(e.title)}</h3>${e.extra ? `<div class="extra">${esc(e.extra)}</div>` : ''}</div>`; }).join('')}</div></div>`;
 }
@@ -119,7 +118,7 @@ setInterval(() => {
   const g = T.game; if (!g || !T.cid) return;
   if (g.roar && !g.roar.done) resolveRoar(T.cid, g, cls());
   const r = g.roar, p = g.pattern;
-  const key = [r && !r.done && t < r.until + 3000, r && r.done && t < (r.doneAt || r.until) + 7000, p && t < Math.min(p.until, p.at + 8000), p && t < p.until, Date.now() - T.phaseAt < 6000,
+  const key = [bossDown(g) && Date.now() - T.phaseAt > 6000, r && !r.done && t < r.until + 3000, r && r.done && t < (r.doneAt || r.until) + 7000, p && t < Math.min(p.until, p.at + 8000), p && t < p.until, Date.now() - T.phaseAt < 6000,
     groupsOf(g, cls()).map(gr => gr.trapUntil && t < gr.trapUntil).join('')].join();
   if (key !== T.viewKey) { T.viewKey = key; render(); }
 }, 300);

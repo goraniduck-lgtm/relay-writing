@@ -140,10 +140,13 @@
   }
 
   /* 8.4 비밀 미션 고르기 — prev {pid: 지난 미션 id} */
-  function pickSecrets(commonTags, mafiaPids, prev, diff, rnd) {
+  /* list: 교사가 고친 비밀 미션 목록 [{id, text, lv, fit}] (없으면 기본 목록) */
+  function pickSecrets(commonTags, mafiaPids, prev, diff, rnd, list) {
     rnd = rnd || Math.random;
     const lvs = (MS.DIFF[diff] || MS.DIFF.mix).lv;
-    const pool = MS.SECRET.filter(s => lvs.includes(s.lv));
+    const all = (list && list.length ? list : MS.SECRET).map(s => Object.assign({}, s, { fit: s.fit && s.fit.length ? s.fit : ['*'] }));
+    let pool = all.filter(s => lvs.includes(s.lv));
+    if (!pool.length) pool = all;                // 고른 난이도의 미션이 없으면 전체에서
     const tags = commonTags || [];
     const fits = pool.filter(s => s.fit.includes('*') || s.fit.some(t => tags.includes(t)));
     const base = fits.length >= Math.min(mafiaPids.length, 2) ? fits : pool;

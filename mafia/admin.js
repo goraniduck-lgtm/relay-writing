@@ -6,7 +6,8 @@ const A = {
   view: 'loading', who: null,           // who: 'teacher' | 'host'
   index: null, meta: null, cfg: null, pub: undefined, roles: null, team: null, sec: null,
   dv: null, nv: null, presence: null, rejoin: null, names: null, pred: null, log: null,
-  showRoles: false, tab: 'play', nextMission: 'random', customMission: '', busy: false, err: ''
+  showRoles: false, tab: 'play', nextMission: 'random', customMission: '', busy: false, err: '',
+  lib: undefined, newTags: { common: {}, secret: {} }, newLv: 1
 };
 const AL = {};
 function listen(key, path, cb) {
@@ -50,6 +51,7 @@ async function login() {
 function openHome() {
   A.view = 'home'; render();
   listen('index', 'mafia/index', v => { A.index = v || {}; render(); });
+  listenLib();
 }
 async function createRoom() {
   const title = ($('#roomTitle') && $('#roomTitle').value.trim()) || '';
@@ -58,6 +60,7 @@ async function createRoom() {
   if (!code) return toast('방 코드를 만들지 못했어요. 다시 눌러 주세요.');
   const t = DB.now();
   const c = DEFAULT_CFG();
+  c.missions = A.lib || defaultLib();
   try {
     await DB.update('mafia', {
       ['index/' + code]: { at: t, title },
@@ -75,8 +78,8 @@ async function deleteRoom(code) {
 
 function openRoom() {
   A.view = 'room'; render();
-  listen('pub', R() + '/pub', v => { A.pub = v; syncRound(); afterPub(); render(); });
-  listen('cfg', R() + '/cfg', v => { A.cfg = v || DEFAULT_CFG(); A.cfg.run = Object.assign(DEFAULT_CFG().run, A.cfg.run || {}); A.cfg.roles = Object.assign(DEFAULT_CFG().roles, A.cfg.roles || {}); render(); });
+  listen('pub', R() + '/pub', v => { const first = A.pub === undefined; A.pub = v; syncRound(); afterPub(); if (first) syncRoomMissions(); render(); });
+  listen('cfg', R() + '/cfg', v => { A.cfgLoaded = true; A.cfg = v || DEFAULT_CFG(); A.cfg.run = Object.assign(DEFAULT_CFG().run, A.cfg.run || {}); A.cfg.roles = Object.assign(DEFAULT_CFG().roles, A.cfg.roles || {}); syncRoomMissions(); render(); });
   listen('roles', R() + '/roles', v => { A.roles = v; render(); });
   listen('team', R() + '/team', v => { A.team = v; });
   listen('sec', R() + '/sec', v => { A.sec = v; render(); });
@@ -84,7 +87,7 @@ function openRoom() {
   listen('rejoin', R() + '/rejoin', v => { A.rejoin = v; render(); });
   listen('names', R() + '/names', v => { A.names = v || {}; });
   listen('log', R() + '/log', v => { A.log = v || {}; });
-  if (isT()) listen('meta', R() + '/meta', v => { A.meta = v; render(); });
+  if (isT()) { listen('meta', R() + '/meta', v => { A.meta = v; render(); }); listenLib(); }
 }
 function syncRound() {
   const s = st();
@@ -163,17 +166,20 @@ async function startGame() {
 /* 낮 시작 (공통 미션 + 비밀 미션) */
 function chosenMission() {
   if (A.nextMission === 'custom') { const t = (A.customMission || '').trim(); return t ? { text: t, tags: [] } : null; }
+  const list = commonList();
+  if (!list.length) return null;
   if (A.nextMission === 'random') {
     const used = new Set(Object.values((A.pub && A.pub.rounds) || {}).map(r => r && r.mission));
-    const pool = MISSIONS.COMMON.filter(x => !used.has(x.text));
-    return Object.assign({}, (pool.length ? pool : MISSIONS.COMMON)[Math.floor(Math.random() * (pool.length || MISSIONS.COMMON.length))]);
+    const pool = list.filter(x => !used.has(x.text));
+    const from = pool.length ? pool : list;
+    return Object.assign({}, from[Math.floor(Math.random() * from.length)]);
   }
-  return MISSIONS.COMMON.find(x => x.id === A.nextMission) || null;
+  return list.find(x => x.id === A.nextMission) || null;
 }
 async function startDay(extend) {
   const s = st();
   const ms = chosenMission();
-  if (!ms) return toast('공통 미션을 적어 주세요.');
+  if (!ms) return toast(A.nextMission === 'custom' ? '공통 미션을 적어 주세요.' : '쓸 수 있는 공통 미션이 없어요. 미션 탭에서 하나 이상 체크해 주세요.');
   if (s.phase === 'reveal') {
     const notReady = Object.values(players()).filter(p => !p.ready).length;
     if (notReady && !confirm(`아직 역할 확인을 안 누른 학생이 ${notReady}명 있어요. 시작할까요?`)) return;
@@ -190,7 +196,7 @@ async function startDay(extend) {
   const mafiaAlive = Object.keys(pl).filter(p => pl[p].alive && (A.roles || {})[p] === 'mafia');
   const prev = {};
   for (const p of mafiaAlive) { const x = A.sec && A.sec[p] && A.sec[p][r - 1]; if (x) prev[p] = x.id; }
-  const picks = Logic.pickSecrets(ms.tags, mafiaAlive, prev, cfg().run.diff);
+  const picks = Logic.pickSecrets(ms.tags, mafiaAlive, prev, cfg().run.diff, null, secretList());
   const up = { ['log/r' + r + '/mission']: ms.text };
   for (const [p, x] of Object.entries(picks)) { up[`sec/${p}/${r}/id`] = x.id; up[`sec/${p}/${r}/m`] = x.m; up[`sec/${p}/${r}/lv`] = x.lv; }
   await DB.update(R(), up).catch(fail('비밀 미션을 보내지 못했어요. 새로고침 후 "비밀 미션 다시 보내기"를 눌러 주세요.'));
@@ -199,8 +205,8 @@ async function resendSecrets() {
   const s = st(); const r = s.round; const pl = players();
   const mafiaAlive = Object.keys(pl).filter(p => pl[p].alive && (A.roles || {})[p] === 'mafia' && !(A.sec && A.sec[p] && A.sec[p][r] && A.sec[p][r].m));
   if (!mafiaAlive.length) return toast('모든 마피아에게 비밀 미션이 있어요.');
-  const ms = MISSIONS.COMMON.find(x => x.text === s.mission) || { tags: [] };
-  const picks = Logic.pickSecrets(ms.tags, mafiaAlive, {}, cfg().run.diff);
+  const ms = commonList().find(x => x.text === s.mission) || { tags: [] };
+  const picks = Logic.pickSecrets(ms.tags, mafiaAlive, {}, cfg().run.diff, null, secretList());
   const up = {};
   for (const [p, x] of Object.entries(picks)) { up[`sec/${p}/${r}/id`] = x.id; up[`sec/${p}/${r}/m`] = x.m; up[`sec/${p}/${r}/lv`] = x.lv; }
   await DB.update(R(), up).then(() => toast('비밀 미션을 보냈어요.')).catch(fail());
@@ -439,6 +445,132 @@ async function newHostKey() {
 /* 설정 저장 */
 function setCfg(path, v) { DB.set(R() + '/cfg/' + path, v).catch(fail()); }
 
+/* ---------- 미션 목록 (교사가 보고·고르고·더하고·고침) ----------
+   기본 목록: mafia/rooms/_library/missions (교사만) — 새 방을 만들 때 방 설정(cfg/missions)으로 복사
+   방 안에서 고치면 기본 목록과 이 방 목록이 함께 바뀜. 사회자는 방 목록을 읽기만 함 */
+const LIB_PATH = 'mafia/rooms/_library/missions';
+const TAGS = { stretch: '스트레칭', talk: '말하기', move: '몸 움직이기', hands: '손 놀이', calm: '조용히', tidy: '정리' };
+function defaultLib() {
+  const common = {}, secret = {};
+  MISSIONS.COMMON.forEach((m, i) => { common[m.id] = { text: m.text, tags: toMap(m.tags), on: true, o: i }; });
+  MISSIONS.SECRET.forEach((m, i) => { secret[m.id] = { text: m.text, lv: m.lv, fit: toMap(m.fit), on: true, o: i }; });
+  return { common, secret };
+}
+function libNow() {
+  const l = (A.view === 'room' && A.cfg && A.cfg.missions) || A.lib || defaultLib();
+  return { common: l.common || {}, secret: l.secret || {} };
+}
+function listOf(kind, onlyOn) {
+  return Object.entries(libNow()[kind] || {}).filter(([, m]) => m && m.text).map(([id, m]) => Object.assign({ id }, m))
+    .filter(m => !onlyOn || m.on !== false).sort((a, b) => (a.o || 0) - (b.o || 0));
+}
+const commonList = () => listOf('common', true).map(m => ({ id: m.id, text: m.text, tags: Object.keys(m.tags || {}) }));
+const secretList = () => listOf('secret', true).map(m => ({ id: m.id, text: m.text, lv: m.lv || 1, fit: Object.keys(m.fit || {}) }));
+function listenLib() {
+  if (!isT()) return;
+  listen('lib', LIB_PATH, v => {
+    if (v == null) { A.lib = defaultLib(); DB.set(LIB_PATH, A.lib).catch(() => {}); }
+    else A.lib = v;
+    syncRoomMissions(); render();
+  });
+}
+/* 교사가 방을 열면: 방 목록이 없거나, 아직 준비 단계면 기본 목록으로 맞춤 */
+function syncRoomMissions() {
+  if (!isT() || A.view !== 'room' || !A.lib || !A.cfgLoaded || A.pub === undefined) return;
+  const room = A.cfg && A.cfg.missions;
+  if (!room || (st().phase === 'lobby' && JSON.stringify(room) !== JSON.stringify(A.lib))) DB.set(R() + '/cfg/missions', A.lib).catch(() => {});
+}
+function missionUpdates(kind, id, patch) {
+  const up = {};
+  for (const [k, v] of Object.entries(patch)) {
+    up[`rooms/_library/missions/${kind}/${id}${k ? '/' + k : ''}`] = v;
+    if (A.view === 'room' && A.cfg && A.cfg.missions) up[`rooms/${A.code}/cfg/missions/${kind}/${id}${k ? '/' + k : ''}`] = v;
+  }
+  return up;
+}
+async function saveMission(kind, id, patch) {
+  if (!isT()) return toast('미션은 선생님만 고칠 수 있어요.');
+  await DB.update('mafia', missionUpdates(kind, id, patch)).catch(fail());
+}
+function toggleTag(kind, id, tag) {
+  if (id === 'new') { A.newTags[kind][tag] = !A.newTags[kind][tag]; if (tag === '*' && A.newTags[kind]['*']) A.newTags[kind] = { '*': true }; else if (tag !== '*') delete A.newTags[kind]['*']; render(); return; }
+  const field = kind === 'common' ? 'tags' : 'fit';
+  const m = libNow()[kind][id] || {}; const cur = m[field] || {};
+  const on = !cur[tag];
+  const patch = { [field + '/' + tag]: on || null };
+  if (kind === 'secret' && on && tag === '*') for (const t of Object.keys(cur)) if (t !== '*') patch[field + '/' + t] = null;
+  if (kind === 'secret' && on && tag !== '*' && cur['*']) patch[field + '/*'] = null;
+  saveMission(kind, id, patch);
+}
+async function addMission(kind) {
+  if (!isT()) return;
+  const el = $(kind === 'common' ? '#newC' : '#newS');
+  const text = (el && el.value || '').trim().slice(0, 80);
+  if (!text) return toast('미션 내용을 적어 주세요.');
+  if (listOf(kind).some(m => m.text === text)) return toast('이미 있는 미션이에요.');
+  const o = Math.max(-1, ...listOf(kind).map(m => m.o || 0)) + 1;
+  const tags = Object.assign({}, A.newTags[kind]);
+  const item = kind === 'common' ? { text, tags, on: true, o } : { text, lv: A.newLv || 1, fit: Object.keys(tags).length ? tags : { '*': true }, on: true, o };
+  const id = (kind === 'common' ? 'c' : 's') + Date.now().toString(36);
+  await DB.update('mafia', missionUpdates(kind, id, { '': item })).then(() => { el.value = ''; A.newTags[kind] = {}; toast('미션을 더했어요.'); render(); }).catch(fail());
+}
+async function delMission(kind, id) {
+  const m = libNow()[kind][id]; if (!m) return;
+  if (!confirm(`"${m.text}" 미션을 지울까요?`)) return;
+  await DB.update('mafia', missionUpdates(kind, id, { '': null })).catch(fail());
+}
+async function moveMission(kind, id, dir) {
+  const list = listOf(kind); const i = list.findIndex(m => m.id === id); const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  const up = Object.assign({}, missionUpdates(kind, list[i].id, { o: list[j].o || j }), missionUpdates(kind, list[j].id, { o: list[i].o || i }));
+  if ((list[i].o || i) === (list[j].o || j)) Object.assign(up, missionUpdates(kind, list[i].id, { o: j }), missionUpdates(kind, list[j].id, { o: i }));
+  await DB.update('mafia', up).catch(fail());
+}
+async function resetLib() {
+  if (!confirm('미션 목록을 처음 기본 목록으로 되돌릴까요? 더하거나 고친 미션은 사라져요.')) return;
+  const d = defaultLib(); const up = { 'rooms/_library/missions': d };
+  if (A.view === 'room') up[`rooms/${A.code}/cfg/missions`] = d;
+  await DB.update('mafia', up).then(() => toast('기본 목록으로 되돌렸어요.')).catch(fail());
+}
+async function swapSecret(pid, mid) {
+  if (!mid) return;
+  const m = secretList().find(x => x.id === mid); const r = st().round; if (!m || !r) return;
+  await DB.update(R(), { [`sec/${pid}/${r}/id`]: m.id, [`sec/${pid}/${r}/m`]: m.text, [`sec/${pid}/${r}/lv`]: m.lv })
+    .then(() => toast(`${pname(A.pub, pid)}의 비밀 미션을 바꿨어요.`)).catch(fail('지금은 바꿀 수 없어요.'));
+}
+
+function missionsHtml() {
+  const ed = isT(); const dis = ed ? '' : 'disabled';
+  const chips = (kind, id, map, withAny) => {
+    const keys = Object.keys(TAGS).concat(withAny ? ['*'] : []);
+    return `<div class="row" style="gap:4px">${keys.map(t => `<button class="chip ${map && map[t] ? 'on' : ''}" data-act="mTag" data-kind="${kind}" data-id="${id}" data-tag="${t}" ${dis}>${t === '*' ? '어디에나' : TAGS[t]}</button>`).join('')}</div>`;
+  };
+  const tools = (kind, m, i, n) => ed ? `<div class="row" style="gap:4px;justify-content:flex-end;flex-wrap:nowrap">
+      <button class="btn sm ghost" data-act="mMove" data-kind="${kind}" data-id="${m.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''} title="위로">▲</button>
+      <button class="btn sm ghost" data-act="mMove" data-kind="${kind}" data-id="${m.id}" data-dir="1" ${i === n - 1 ? 'disabled' : ''} title="아래로">▼</button>
+      <button class="btn sm ghost" data-act="mDel" data-kind="${kind}" data-id="${m.id}" title="지우기">🗑</button></div>` : '';
+  const cl = listOf('common'), sl = listOf('secret');
+  const onC = cl.filter(m => m.on !== false).length, onS = sl.filter(m => m.on !== false).length;
+  const lvSel = (id, v, act) => `<select class="num" style="width:auto" id="${id}" data-act-change="${act}" ${act === 'mLv' ? `data-id="${id.slice(4)}"` : ''} ${dis}>${[1, 2, 3].map(l => `<option value="${l}" ${+v === l ? 'selected' : ''}>${MISSIONS.LV_NAME[l]}</option>`).join('')}</select>`;
+  return `<div class="card"><div class="row"><h3 class="grow">🗒 미션 목록</h3>${ed ? '<button class="btn sm ghost" data-act="mReset">기본 목록으로 되돌리기</button>' : ''}</div>
+      <p class="small muted">✅ 체크한 미션만 게임에 나와요. ${ed ? '글을 고치면 칸을 벗어날 때 저장돼요. 여기서 고친 목록은 앞으로 만드는 방에도 그대로 쓰여요.' : '미션은 선생님만 고칠 수 있어요.'}
+      ${A.view === 'room' && st().phase !== 'lobby' ? '<br>게임 중에 고치면 다음 날 미션부터 바뀐 목록이 쓰여요.' : ''}</p></div>
+    <div class="card"><h3>☀️ 공통 미션 <span class="pill">${onC}/${cl.length}개 사용</span></h3>
+      <p class="small muted">모두가 함께 하는 미션이에요. "종류"는 어울리는 비밀 미션을 고를 때 써요.</p>
+      <div style="overflow:auto"><table class="tbl"><tr><th>사용</th><th>미션</th><th>종류</th><th></th></tr>${cl.map((m, i) => `<tr>
+        <td><input type="checkbox" id="mon_c_${m.id}" data-act-change="mOn" data-kind="common" data-id="${m.id}" ${m.on !== false ? 'checked' : ''} ${dis} style="width:22px;height:22px"></td>
+        <td style="min-width:240px"><input class="in mtext" id="mt_c_${m.id}" data-act-change="mText" data-kind="common" data-id="${m.id}" value="${esc(m.text)}" maxlength="80" ${dis}></td>
+        <td>${chips('common', m.id, m.tags)}</td><td>${tools('common', m, i, cl.length)}</td></tr>`).join('')}</table></div>
+      ${ed ? `<div class="addrow"><b>＋ 새 공통 미션</b><input class="in mtext" id="newC" maxlength="80" placeholder="예: 옆 친구와 손뼉 세 번 마주치기">${chips('common', 'new', A.newTags.common)}<button class="btn sm" data-act="mAdd" data-kind="common">추가</button></div>` : ''}</div>
+    <div class="card"><h3>🤫 마피아 비밀 미션 <span class="pill">${onS}/${sl.length}개 사용</span></h3>
+      <p class="small muted">마피아가 몰래 하는 행동이에요. 난이도는 설정의 "비밀 미션 난이도"와 맞춰 뽑히고, "어울리는 공통 미션"이 같은 종류인 것이 먼저 뽑혀요.</p>
+      <div style="overflow:auto"><table class="tbl"><tr><th>사용</th><th>미션</th><th>난이도</th><th>어울리는 공통 미션</th><th></th></tr>${sl.map((m, i) => `<tr>
+        <td><input type="checkbox" id="mon_s_${m.id}" data-act-change="mOn" data-kind="secret" data-id="${m.id}" ${m.on !== false ? 'checked' : ''} ${dis} style="width:22px;height:22px"></td>
+        <td style="min-width:200px"><input class="in mtext" id="mt_s_${m.id}" data-act-change="mText" data-kind="secret" data-id="${m.id}" value="${esc(m.text)}" maxlength="80" ${dis}></td>
+        <td>${lvSel('mlv_' + m.id, m.lv, 'mLv')}</td><td>${chips('secret', m.id, m.fit, true)}</td><td>${tools('secret', m, i, sl.length)}</td></tr>`).join('')}</table></div>
+      ${ed ? `<div class="addrow"><b>＋ 새 비밀 미션</b><input class="in mtext" id="newS" maxlength="80" placeholder="예: 안경 한 번 고쳐 쓰기">${lvSel('newLvSel', A.newLv, 'newLv')}${chips('secret', 'new', A.newTags.secret, true)}<button class="btn sm" data-act="mAdd" data-kind="secret">추가</button></div>` : ''}</div>`;
+}
+
 /* ---------- 모달 ---------- */
 function modal(html) { $('#modal').innerHTML = `<div class="modal-bg" data-act="closeModal"><div class="modal">${html}</div></div>`; }
 function closeModal() { $('#modal').innerHTML = ''; }
@@ -458,6 +590,7 @@ function render() {
     paint(main, `<div class="card hero"><div class="ic">🔒</div><h2>사회자 링크가 맞지 않아요</h2><p>선생님께 새 사회자 링크(QR)를 받아 주세요.</p></div>`); return;
   }
   if (A.view === 'home') return renderHome();
+  if (A.view === 'libEdit') { document.body.className = 'm-lobby'; paint($('#top'), ''); paint(main, `<div class="row" style="margin-top:12px"><button class="btn sm ghost" data-act="home">◀ 게임 방 목록</button></div>` + missionsHtml()); return; }
   if (A.view !== 'room') return;
   if (A.pub === undefined) { paint(main, `<div class="hero"><p>방을 불러오는 중…</p></div>`); return; }
   if (A.pub === null) { paint(main, `<div class="card hero"><h2>방을 찾을 수 없어요 (${esc(A.code)})</h2>${isT() ? '<a class="btn" href="admin.html">방 목록으로</a>' : ''}</div>`); return; }
@@ -468,6 +601,7 @@ function render() {
       <button class="${A.tab === 'play' ? 'on' : ''}" data-act="tab" data-id="play">진행</button>
       <button class="${A.tab === 'people' ? 'on' : ''}" data-act="tab" data-id="people">참가자 ${Object.keys(players()).length}</button>
       <button class="${A.tab === 'links' ? 'on' : ''}" data-act="tab" data-id="links">참가 링크·QR</button>
+      <button class="${A.tab === 'missions' ? 'on' : ''}" data-act="tab" data-id="missions">미션</button>
       ${isT() ? `<button class="${A.tab === 'log' ? 'on' : ''}" data-act="tab" data-id="log">기록</button>` : ''}
     </div><span class="grow"></span>${rejoinBadge()}</div>`;
   let body = '';
@@ -475,6 +609,7 @@ function render() {
   else if (A.tab === 'people') body = peopleHtml();
   else if (A.tab === 'links') body = linksHtml();
   else if (A.tab === 'log') body = logHtml();
+  else if (A.tab === 'missions') body = missionsHtml();
   paint(main, tabs + rejoinHtml() + body);
   if (A.tab === 'links' || (A.tab === 'play' && s.phase === 'lobby')) document.querySelectorAll('[data-qr]').forEach(el => { if (el.dataset.done !== el.dataset.qr) { qr(el, el.dataset.qr, +el.dataset.size || 150); el.dataset.done = el.dataset.qr; } });
 }
@@ -483,7 +618,8 @@ function renderHome() {
   document.body.className = 'm-lobby'; paint($('#top'), '');
   const rooms = Object.entries(A.index || {}).sort((a, b) => b[1].at - a[1].at);
   paint($('#main'), `<div class="card"><h2>🕶️ 교실 마피아 — 게임 방</h2>
-      <div class="row" style="margin-top:12px"><input class="in grow" id="roomTitle" placeholder="방 이름 (예: 4학년 2반, 선택)" style="max-width:360px"><button class="btn" data-act="createRoom">＋ 새 게임 방 만들기</button></div></div>
+      <div class="row" style="margin-top:12px"><input class="in grow" id="roomTitle" placeholder="방 이름 (예: 4학년 2반, 선택)" style="max-width:360px"><button class="btn" data-act="createRoom">＋ 새 게임 방 만들기</button>
+      <button class="btn soft" data-act="libEdit">🗒 미션 목록 관리</button></div></div>
     <div class="card"><h3>내 게임 방</h3>${rooms.length ? `<table class="tbl">${rooms.map(([c, r]) => `<tr><td><b style="font-size:1.2rem;letter-spacing:2px">${c}</b></td><td>${esc(r.title || '')}</td>
       <td class="small muted">${new Date(r.at).toLocaleString('ko-KR')}</td><td style="text-align:right"><a class="btn sm" href="admin.html?r=${c}">열기</a> <button class="btn sm ghost" data-act="delRoom" data-id="${c}">지우기</button></td></tr>`).join('')}</table>` : '<p class="muted">아직 방이 없어요.</p>'}</div>
     <p class="center small muted"><a href="#" data-act="logout">로그아웃</a></p>`);
@@ -530,10 +666,11 @@ function guideHtml() {
 }
 
 function missionChooser(label) {
-  const opts = MISSIONS.COMMON.map(m => `<option value="${m.id}" ${A.nextMission === m.id ? 'selected' : ''}>${esc(m.text)}</option>`).join('');
+  const opts = commonList().map(m => `<option value="${m.id}" ${A.nextMission === m.id ? 'selected' : ''}>${esc(m.text)}</option>`).join('');
   return `<label class="field"><span>${label || '오늘의 공통 미션'}</span>
     <select class="in" id="missionSel" data-act-change="missionSel"><option value="random" ${A.nextMission === 'random' ? 'selected' : ''}>🎲 무작위로 고르기</option>${opts}<option value="custom" ${A.nextMission === 'custom' ? 'selected' : ''}>✏️ 직접 적기</option></select></label>
-    ${A.nextMission === 'custom' ? `<input class="in" id="customMission" data-act-input="customMission" placeholder="예: 옆 친구와 손뼉 맞추기" value="${esc(A.customMission)}">` : ''}`;
+    ${A.nextMission === 'custom' ? `<input class="in" id="customMission" data-act-input="customMission" placeholder="예: 옆 친구와 손뼉 맞추기" value="${esc(A.customMission)}">` : ''}
+    <p class="small muted" style="margin:4px 0 10px">미션 목록은 <a href="#" data-act="tab" data-id="missions">미션 탭</a>에서 ${isT() ? '고치거나 더할' : '볼'} 수 있어요.</p>`;
 }
 
 function phasePanel() {
@@ -597,7 +734,9 @@ function secretPanel() {
     const success = Object.keys(ok).length > 0;
     const who = Object.entries(ok).map(([w, v]) => `${w === 'teacher' ? '교사' : '사회자'} ${new Date(v.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`).join(', ');
     if (!pl[p].alive) return `<tr class="muted"><td>${esc(pl[p].name)}</td><td colspan="3">탈락</td></tr>`;
-    return `<tr><td><b>${esc(pl[p].name)}</b></td><td>${x.m ? esc(x.m) + ` <span class="pill">${MISSIONS.LV_NAME[x.lv] || ''}</span>` : '<span class="muted">미션 없음</span>'}</td>
+    const canSwap = !locked && !success && x.m;
+    return `<tr><td><b>${esc(pl[p].name)}</b></td><td>${x.m ? esc(x.m) + ` <span class="pill">${MISSIONS.LV_NAME[x.lv] || ''}</span>` : '<span class="muted">미션 없음</span>'}
+      ${canSwap ? `<div><select class="num" style="width:auto;max-width:260px;font-size:.85rem;margin-top:4px" id="swap_${p}" data-act-change="swapSecret" data-id="${p}"><option value="">↻ 다른 미션으로 바꾸기</option>${secretList().filter(m => m.id !== x.id).map(m => `<option value="${m.id}">${esc(m.text)} (${MISSIONS.LV_NAME[m.lv] || ''})</option>`).join('')}</select></div>` : ''}</td>
       <td>${success ? `<span class="pill good">공격권 획득</span><div class="small muted">${who}</div>` : '<span class="pill">미확인</span>'}</td>
       <td style="text-align:right">${canConfirm && x.m ? (mine ? `<button class="btn sm ghost" data-act="unconfirm" data-id="${p}">확인 취소</button>` : `<button class="btn sm good" data-act="confirm" data-id="${p}">✔ 확인</button>`) : ''}</td></tr>`;
   }).join('');
@@ -798,6 +937,9 @@ document.addEventListener('click', e => {
     confirm: () => confirmMission(id, true), unconfirm: () => confirmMission(id, false),
     removePlayer: () => removePlayer(id), approve: () => approveRejoin(id), reject: () => rejectRejoin(id), toggleAlive: () => toggleAlive(id),
     newHostKey, resendSecrets, resendRoles, exportLog,
+    libEdit: () => { A.view = 'libEdit'; render(); }, home: () => { A.view = 'home'; render(); },
+    mTag: () => toggleTag(b.dataset.kind, id, b.dataset.tag), mDel: () => delMission(b.dataset.kind, id),
+    mAdd: () => addMission(b.dataset.kind), mReset: resetLib, mMove: () => moveMission(b.dataset.kind, id, +b.dataset.dir),
     mafiaAuto: () => setCfg('roles/mafia', null),
     cfg: () => setCfg(b.dataset.path, JSON.parse(b.dataset.val))
   }[a];
@@ -811,6 +953,11 @@ document.addEventListener('change', e => {
   else if (a === 'time') { const v = Math.max(5, parseInt(el.value, 10) || DEFAULT_TIMES[el.dataset.id]); setCfg('run/times/' + el.dataset.id, v); }
   else if (a === 'diff') setCfg('run/diff', el.value);
   else if (a === 'manualRole') setCfg('roles/manual/' + el.dataset.id, el.value || null);
+  else if (a === 'mText') { const v = el.value.trim(); if (v) saveMission(el.dataset.kind, el.dataset.id, { text: v.slice(0, 80) }); else { el.value = (libNow()[el.dataset.kind][el.dataset.id] || {}).text || ''; toast('미션 내용을 비울 수 없어요.'); } }
+  else if (a === 'mOn') saveMission(el.dataset.kind, el.dataset.id, { on: el.checked });
+  else if (a === 'mLv') saveMission('secret', el.dataset.id, { lv: +el.value });
+  else if (a === 'newLv') A.newLv = +el.value;
+  else if (a === 'swapSecret') swapSecret(el.dataset.id, el.value);
 });
 document.addEventListener('input', e => { if (e.target.dataset.actInput === 'customMission') A.customMission = e.target.value; });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pw') login(); });

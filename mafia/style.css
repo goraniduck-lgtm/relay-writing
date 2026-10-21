@@ -152,3 +152,11 @@ body.tv{overflow:hidden}
 .tv-names{display:flex;flex-wrap:wrap;gap:1vh;justify-content:center;max-width:90vw;font-size:3vh;font-weight:700}
 .tv-names span{background:var(--card);border-radius:1.2vh;padding:.6vh 1.2vw;border:2px solid var(--line)}
 .tv-qr{background:#fff;padding:1.5vh;border-radius:2vh;display:inline-block}
+
+/* 미션 목록 */
+.chip{padding:5px 9px;border-radius:999px;border:2px solid var(--line);background:var(--card);color:var(--ink);font-size:.82rem;font-weight:700}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip:disabled{opacity:.7;cursor:default}
+.in.mtext{font-size:1rem;padding:8px 10px}
+.addrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;padding:12px;border-radius:14px;background:var(--bg2)}
+.addrow .in{flex:1;min-width:220px}

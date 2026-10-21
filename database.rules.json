@@ -1,19 +1,23 @@
 {
   "rules": {
-    ".read": "auth != null",
     "classList": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'"
     },
     "classes": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'"
     },
     "archives": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'"
     },
     "archiveIndex": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'"
     },
     "stories": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'",
       "$cid": {
         "$gid": {
@@ -22,6 +26,7 @@
       }
     },
     "presence": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'",
       "$cid": {
         "$no": {
@@ -30,6 +35,7 @@
       }
     },
     "relayDrawing": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'",
       "games": {
         "$cid": {
@@ -38,10 +44,161 @@
       }
     },
     "raid": {
+      ".read": "auth != null",
       ".write": "auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'",
       "games": {
         "$cid": {
           ".write": "auth != null && root.child('raid/classes/' + $cid).exists()"
+        }
+      }
+    },
+    "relay": {
+      ".read": "auth != null"
+    },
+    "mafia": {
+      "index": {
+        ".read": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+        ".write": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')"
+      },
+      "rooms": {
+        "$c": {
+          ".read": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+          ".write": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+          "hosts": {
+            "$u": {
+              ".read": "auth != null && auth.uid === $u",
+              ".write": "auth != null && auth.uid === $u && newData.child('key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()"
+            }
+          },
+          "cfg": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))"
+          },
+          "pub": {
+            ".read": "auth != null",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "state": {
+              "maxR": {
+                ".validate": "newData.isNumber() && (!data.exists() || newData.val() <= data.val() || (auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2'))"
+              }
+            },
+            "end": {
+              ".validate": "newData.child('method').val() === 'normal' || (auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || newData.child('method').val() === data.child('method').val()"
+            },
+            "players": {
+              "$p": {
+                ".write": "auth != null && !data.exists() && root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'lobby' && newData.child('uid').val() === auth.uid && newData.child('alive').val() === true && newData.parent().parent().parent().child('me/' + auth.uid).val() === $p && newData.parent().parent().parent().child('names/' + newData.child('key').val()).val() === $p",
+                "name": {
+                  ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+                },
+                "ready": {
+                  ".write": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p) && newData.isBoolean()"
+                }
+              }
+            }
+          },
+          "names": {
+            ".read": "auth != null",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$k": {
+              ".write": "auth != null && !data.exists() && root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'lobby' && newData.isString() && newData.parent().parent().child('pub/players/' + newData.val() + '/uid').val() === auth.uid"
+            }
+          },
+          "me": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$u": {
+              ".read": "auth != null && auth.uid === $u",
+              ".write": "auth != null && auth.uid === $u && !data.exists() && newData.isString() && newData.parent().parent().child('pub/players/' + newData.val() + '/uid').val() === auth.uid"
+            }
+          },
+          "presence": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$p": {
+              ".write": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p)"
+            }
+          },
+          "roles": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$p": {
+              ".read": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p)"
+            }
+          },
+          "team": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val())) || (auth != null && root.child('mafia/rooms/' + $c + '/roles/' + root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val()).val() === 'mafia')",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))"
+          },
+          "sec": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$p": {
+              ".read": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p)",
+              "$r": {
+                "id": {
+                  ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))"
+                },
+                "m": {
+                  ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))"
+                },
+                "lv": {
+                  ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))"
+                },
+                "ok": {
+                  "$w": {
+                    ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val())) && ($w === 'host' || $w === 'teacher') && root.child('mafia/rooms/' + $c + '/pub/state/rk').val() === $r && (root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'mission' || root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'think' || root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'meeting' || root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'vote' || root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'dayResult')"
+                  }
+                }
+              }
+            }
+          },
+          "dv": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$r": {
+              "$s": {
+                "$p": {
+                  ".read": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p)",
+                  ".write": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p) && !data.exists() && newData.isString() && root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'vote' && root.child('mafia/rooms/' + $c + '/pub/state/open').val() === true && root.child('mafia/rooms/' + $c + '/pub/state/paused').val() !== true && root.child('mafia/rooms/' + $c + '/pub/state/rk').val() === $r && root.child('mafia/rooms/' + $c + '/pub/state/sk').val() === $s && root.child('mafia/rooms/' + $c + '/pub/players/' + $p + '/alive').val() === true && newData.val() !== $p && root.child('mafia/rooms/' + $c + '/pub/players/' + newData.val() + '/alive').val() === true && ($s === '1' || root.child('mafia/rooms/' + $c + '/pub/state/cands').child(newData.val()).exists())"
+                }
+              }
+            }
+          },
+          "nv": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$r": {
+              "m": {
+                "$p": {
+                  ".read": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p)",
+                  ".write": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p) && newData.isString() && root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'night' && root.child('mafia/rooms/' + $c + '/pub/state/open').val() === true && root.child('mafia/rooms/' + $c + '/pub/state/paused').val() !== true && root.child('mafia/rooms/' + $c + '/pub/state/rk').val() === $r && root.child('mafia/rooms/' + $c + '/roles/' + $p).val() === 'mafia' && root.child('mafia/rooms/' + $c + '/pub/players/' + $p + '/alive').val() === true && root.child('mafia/rooms/' + $c + '/sec/' + $p + '/' + $r + '/ok').hasChildren() && root.child('mafia/rooms/' + $c + '/pub/players/' + newData.val() + '/alive').val() === true && root.child('mafia/rooms/' + $c + '/roles/' + newData.val()).val() !== 'mafia'"
+                }
+              },
+              "d": {
+                "$p": {
+                  ".read": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p)",
+                  ".write": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p) && newData.isString() && root.child('mafia/rooms/' + $c + '/pub/state/phase').val() === 'night' && root.child('mafia/rooms/' + $c + '/pub/state/open').val() === true && root.child('mafia/rooms/' + $c + '/pub/state/paused').val() !== true && root.child('mafia/rooms/' + $c + '/pub/state/rk').val() === $r && root.child('mafia/rooms/' + $c + '/roles/' + $p).val() === 'doctor' && root.child('mafia/rooms/' + $c + '/pub/players/' + $p + '/alive').val() === true && root.child('mafia/rooms/' + $c + '/pub/players/' + newData.val() + '/alive').val() === true"
+                }
+              }
+            }
+          },
+          "pred": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$p": {
+              ".read": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p)",
+              ".write": "(auth != null && root.child('mafia/rooms/' + $c + '/me/' + auth.uid).val() === $p) && root.child('mafia/rooms/' + $c + '/pub/players/' + $p + '/alive').val() === false && root.child('mafia/rooms/' + $c + '/pub/state/phase').val() !== 'end' && root.child('mafia/rooms/' + $c + '/pub/state/phase').val() !== 'lobby'"
+            }
+          },
+          "log": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))"
+          },
+          "rejoin": {
+            ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('mafia/rooms/' + $c + '/meta/hostKey').exists() && root.child('mafia/rooms/' + $c + '/hosts/' + auth.uid + '/key').val() === root.child('mafia/rooms/' + $c + '/meta/hostKey').val()))",
+            "$u": {
+              ".read": "auth != null && auth.uid === $u",
+              ".write": "auth != null && auth.uid === $u && newData.child('name').isString() && !newData.child('pid').exists()"
+            }
+          }
         }
       }
     }

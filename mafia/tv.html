@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>교실 마피아 — TV</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="tv m-lobby">
+<div id="tv"><div class="tv-wrap"><div></div><div class="tv-mid"><div class="ic">📺</div><h1>교실 마피아</h1><p class="desc" id="tvLoading">불러오는 중…</p></div><div></div></div></div>
+<div id="ov"></div>
+<script src="missions.js"></script>
+<script src="logic.js"></script>
+<script src="common.js"></script>
+<script>
+/* 교실 TV — 공개 정보(pub)만 읽음. 조작 기능 없음 */
+const T = { code: (qp.get('r') || '').toUpperCase(), pub: undefined, online: true };
+startTicker(() => T.pub && T.pub.state);
+(async () => {
+  if (!T.code) { document.getElementById('tvLoading').textContent = '주소 끝에 ?r=방코드 를 붙여 주세요.'; return; }
+  try { await DB.ready(true); } catch (e) { document.getElementById('tvLoading').textContent = '접속하지 못했어요. 인터넷을 확인해 주세요.'; return; }
+  DB.on(ROOM_PATH(T.code) + '/pub', v => { T.pub = v; render(); }, () => {});
+  DB.connected(on => { T.online = on; render(); });
+})();
+
+function render() {
+  const p = T.pub;
+  if (p === undefined) return;
+  if (p === null) { paint(document.getElementById('tv'), `<div class="tv-wrap"><div></div><div class="tv-mid"><h1>방을 찾을 수 없어요</h1><p class="desc">${esc(T.code)}</p></div><div></div></div>`); return; }
+  const s = p.state || {}; const ph = PH[s.phase] || PH.lobby;
+  document.body.className = 'tv m-' + ph.mood;
+  const alive = aliveList(p).length, dead = deadList(p).length;
+  const top = `<div class="tv-top"><span class="chip">${s.round ? s.round + '일째' : '준비'}</span>
+    <span class="chip">${s.phase === 'night' ? '🌙 밤' : s.phase && !['lobby', 'reveal', 'end', 'limit'].includes(s.phase) ? '☀️ 낮' : ph.icon} · ${esc(ph.name)}</span>
+    <span class="chip">생존 ${alive}명 · 탈락 ${dead}명</span></div>`;
+  let mid = '', note = '';
+  const r = (p.rounds || {})[s.round] || {};
+  switch (s.phase) {
+    case 'lobby': {
+      const names = Object.values(p.players || {}).sort(byName);
+      mid = `<h1>🕶️ 교실 마피아</h1><div class="row" style="gap:4vw;justify-content:center;align-items:center">
+        <div class="tv-qr" id="joinQr"></div><div><div class="desc">참가 코드</div><div style="font-family:Maplestory;font-size:12vh;letter-spacing:1.5vw">${esc(T.code)}</div><div class="desc">${names.length}명 입장</div></div></div>
+        <div class="tv-names">${names.map(n => `<span>${esc(n.name)}</span>`).join('')}</div>`;
+      note = '태블릿으로 QR을 찍거나 코드를 넣어 들어와요.'; break;
+    }
+    case 'reveal': {
+      const all = Object.values(p.players || {}); const ok = all.filter(x => x.ready).length;
+      mid = `<div class="ic">🃏</div><h1>역할 확인</h1><p class="desc">옆 친구가 보지 않게 화면을 가리고,<br>버튼을 꾹 눌러 내 역할을 확인해요.</p><p class="desc">확인 완료 ${ok} / ${all.length}명</p>`;
+      note = '절대 소리 내거나 표정으로 알려 주지 않기!'; break;
+    }
+    case 'mission':
+      mid = `<div class="ic">🤸</div><h1>공통 미션</h1><div class="mission">${esc(s.mission || '')}</div>`;
+      note = '모두 함께 해요. 친구들의 행동을 잘 살펴보세요! 👀'; break;
+    case 'think':
+      mid = `<div class="ic">🤔</div><h1>개인 추리</h1><p class="desc">미션하는 동안 본 행동을 떠올려요.<br>누가 수상했나요? 아직은 혼자 생각해요.</p>`;
+      note = '조용히 생각하는 시간'; break;
+    case 'meeting':
+      mid = `<div class="ic">🗣️</div><h1>시민 회의</h1><p class="desc" style="text-align:left;line-height:1.7">✋ 사회자가 부르면 말해요 &nbsp; 👂 말 끊지 않기<br>👀 본 행동을 근거로 말해요 &nbsp; 💛 사이·감정으로 몰아가지 않기<br>👻 탈락한 친구는 말하지 않아요</p>`;
+      note = '살아 있는 친구만 말할 수 있어요'; break;
+    case 'vote': {
+      const cands = Object.keys(s.cands || {}).map(id => pname(p, id));
+      mid = `<div class="ic">🗳️</div><h1>${s.stage === 2 ? '재투표' : '낮 투표'}</h1>
+        ${s.stage === 2 ? `<p class="desc">후보: ${cands.map(esc).join(', ')}</p>` : '<p class="desc">가장 마피아 같은 친구 한 명에게 투표해요.</p>'}
+        <p class="desc" style="font-size:6vh">${s.open ? `제출 ${s.vc || 0} / ${alive}명` : '투표를 세는 중…'}</p>`;
+      note = '누구에게 투표했는지는 비밀이에요'; break;
+    }
+    case 'dayResult': {
+      const d = (r.day || {})['s' + s.stage] || {};
+      const rows = Object.entries(d.tally || {}).sort((a, b) => b[1] - a[1]); const max = rows.length ? rows[0][1] : 1;
+      const head = { top: `${esc(pname(p, d.out))} 탈락`, tie: '동점! 재투표해요', tie2: '재투표도 동점 — 아무도 탈락하지 않았어요', novote: '아무도 탈락하지 않았어요' }[d.reason] || '';
+      mid = `<h1>📢 ${head}</h1><div class="tv-tally">${rows.slice(0, 8).map(([id, n]) => `<div class="tr ${id === d.out ? 'out' : ''}"><span>${esc(pname(p, id))}</span><div class="bar" style="width:${n / max * 100}%"></div><span>${n}표</span></div>`).join('')}</div>`;
+      note = d.reason === 'top' ? '탈락한 친구의 역할은 게임이 끝날 때 공개돼요' : ''; break;
+    }
+    case 'night':
+      mid = `<div class="ic">🌙</div><h1>밤이 되었어요</h1><p class="desc">모두 태블릿을 가리고<br>한 명을 고른 뒤 <b>확인</b>을 누르세요.</p>`;
+      note = '조용히! 고개를 숙이고 내 화면만 봐요'; break;
+    case 'morning': {
+      const out = r.night && r.night.out;
+      mid = `<div class="ic">🌅</div><h1>아침이 밝았어요</h1><p class="desc" style="font-size:6vh">${out ? `지난밤 <b>${esc(pname(p, out))}</b>이(가) 탈락했어요.` : '지난밤 아무도 탈락하지 않았어요.'}</p><p class="desc">살아 있는 친구 ${alive}명</p>`;
+      note = '다음 날을 준비해요'; break;
+    }
+    case 'limit':
+      mid = `<div class="ic">⏳</div><h1>약속한 라운드 끝!</h1><p class="desc">선생님이 끝낼지, 더 할지 정하고 있어요.</p>`; break;
+    case 'end': {
+      const e = p.end || {};
+      const rows = Object.entries(p.players || {}).map(([id, x]) => ({ id, ...x, role: (e.roles || {})[id] }))
+        .sort((a, b) => (a.role === 'mafia' ? 0 : a.role === 'doctor' ? 1 : 2) - (b.role === 'mafia' ? 0 : b.role === 'doctor' ? 1 : 2) || byName(a, b));
+      mid = `<h1>🏁 ${WINNER_TEXT[e.winner] || '게임 종료'}</h1>
+        <p class="desc">${esc(END_METHOD[e.method] || '')} · 남은 인원 시민 팀 ${e.alive ? e.alive.citizen : '?'}명 · 마피아 팀 ${e.alive ? e.alive.mafia : '?'}명
+        ${e.rate ? `<br>생존율 시민 팀 ${e.rate.citizen}% · 마피아 팀 ${e.rate.mafia}%` : ''}</p>
+        <div class="tv-roles">${rows.map(x => `<div class="r ${x.role || ''} ${x.alive ? '' : 'dead'}"><span>${esc(x.name)}</span><span>${x.role ? Logic.ROLES[x.role].emoji + ' ' + Logic.ROLES[x.role].name : ''}</span></div>`).join('')}</div>`;
+      break;
+    }
+  }
+  const timer = (PH[s.phase] || {}).timer && s.timer ? `<div class="bigtimer" data-timer>${fmt(remaining(s))}</div>` : '';
+  paint(document.getElementById('tv'), `<div class="tv-wrap">${top}<div class="tv-mid">${mid}</div><div class="tv-bot">${timer}${note ? `<div class="note">${note}</div>` : ''}</div></div>`);
+  const q = document.getElementById('joinQr'); if (q && !q.dataset.done) { qr(q, studentUrl(T.code).replace('tv.html', ''), Math.round(window.innerHeight * 0.3)); q.dataset.done = 1; }
+  paint(document.getElementById('ov'), (s.paused ? '<div class="tv-pause">⏸ 잠시 멈춤</div>' : '') + (s.msg && s.msg.text ? `<div class="tv-msg">📣 ${esc(s.msg.text)}</div>` : '') + (!T.online ? '<div class="tv-msg" style="top:auto;bottom:4vh;background:#555;font-size:3vh">연결을 다시 잇는 중…</div>' : ''));
+}
+window.addEventListener('resize', () => { const q = document.getElementById('joinQr'); if (q) { q.dataset.done = ''; render(); } });
+</script>
+</body>
+</html>

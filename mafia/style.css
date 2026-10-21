@@ -1,0 +1,154 @@
+/* 교실 마피아 — 공통 스타일 */
+@font-face{font-family:"Maplestory";src:url("../raid/fonts/Maplestory_Bold.woff2") format("woff2");font-weight:400 900;font-display:swap}
+@font-face{font-family:"Maplestory";src:url("../raid/fonts/Maplestory_Light.woff2") format("woff2");font-weight:100 300;font-display:swap}
+@font-face{font-family:"Bareon";src:url("../raid/fonts/HakgyoansimBareondotumR.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Bareon";src:url("../raid/fonts/HakgyoansimBareondotumB.woff2") format("woff2");font-weight:700;font-display:swap}
+
+:root{
+  --bg:#fff7e6; --bg2:#ffefc9; --card:#ffffff; --ink:#2c2416; --muted:#7a6b52; --line:#ead9b4;
+  --accent:#ff8a3d; --accent2:#ffb36b; --good:#2fa36b; --bad:#e2504c; --info:#3d7bff; --mafia:#3a2f5e;
+  --radius:18px; --shadow:0 4px 0 rgba(0,0,0,.08), 0 8px 24px rgba(80,50,0,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:"Bareon",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--ink);background:var(--bg);
+  min-height:100vh;-webkit-tap-highlight-color:transparent;transition:background .4s,color .4s}
+h1,h2,h3,.title{font-family:"Maplestory",sans-serif;font-weight:700;margin:0}
+button{font:inherit;cursor:pointer;border:0;touch-action:manipulation}
+input,select,textarea{font:inherit;color:inherit}
+.hide{display:none!important}
+
+/* 분위기 */
+body.m-lobby{--bg:#fff7e6;--bg2:#ffefc9}
+body.m-reveal{--bg:#f1ecff;--bg2:#e2d8ff;--accent:#7b5cff;--accent2:#a28cff;--line:#d9cff8}
+body.m-day{--bg:#fff6d6;--bg2:#ffe9a3;--accent:#ff9d00;--accent2:#ffc04d;--line:#f2dc97}
+body.m-think{--bg:#eaf5ff;--bg2:#d2e9ff;--accent:#3d8bff;--accent2:#7db1ff;--line:#c7ddf5}
+body.m-meeting{--bg:#e9f8ee;--bg2:#cdeed8;--accent:#25a35a;--accent2:#5cc584;--line:#c4e6cf}
+body.m-vote{--bg:#fff0ea;--bg2:#ffd9c9;--accent:#f0613a;--accent2:#ff8f6b;--line:#f5cdbd}
+body.m-morning{--bg:#fff1ef;--bg2:#ffd9d2;--accent:#f0806a;--accent2:#ffaa96;--line:#f4d1c9}
+body.m-end{--bg:#fff8dc;--bg2:#ffe99a;--accent:#d99a00;--accent2:#f5c33b;--line:#efdc9a}
+body.m-night{--bg:#141a33;--bg2:#1e2650;--card:#232c58;--ink:#eef1ff;--muted:#a9b2da;--line:#36417a;--accent:#8c7dff;--accent2:#b0a6ff;
+  --shadow:0 4px 0 rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3)}
+
+.wrap{max-width:860px;margin:0 auto;padding:14px 16px 120px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin:12px 0;border:2px solid var(--line)}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+.center{text-align:center}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 18px;border-radius:14px;background:var(--accent);color:#fff;
+  font-family:"Maplestory",sans-serif;font-weight:700;font-size:1.05rem;box-shadow:0 4px 0 rgba(0,0,0,.18);min-height:48px}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.big{font-size:1.35rem;padding:16px 26px;min-height:62px;width:100%}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line);box-shadow:none}
+.btn.soft{background:var(--bg2);color:var(--ink);box-shadow:0 3px 0 var(--line)}
+.btn.good{background:var(--good)} .btn.bad{background:var(--bad)} .btn.dark{background:#3b3355}
+.btn.sm{padding:8px 12px;min-height:38px;font-size:.92rem;border-radius:10px}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--bg2);font-size:.85rem;font-weight:700}
+.pill.good{background:#d9f5e5;color:#17633d} .pill.bad{background:#fde0de;color:#9b2522} .pill.info{background:#dfe9ff;color:#1f4fb8}
+.pill.mafia{background:#3a2f5e;color:#fff} .pill.doctor{background:#d9f5ef;color:#0f6b57} .pill.citizen{background:#fff0c7;color:#7a5600}
+body.m-night .pill{background:#2e3870;color:#dfe3ff}
+.field{display:block;margin:10px 0}
+.field>span{display:block;font-weight:700;margin-bottom:6px}
+.in{width:100%;padding:14px;border-radius:12px;border:2px solid var(--line);background:#fff;font-size:1.2rem;color:#2c2416}
+textarea.in{min-height:80px;font-size:1rem}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2c2416;color:#fff;padding:12px 18px;border-radius:12px;z-index:99;
+  font-weight:700;max-width:92vw;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+
+/* 상단 바 */
+.topbar{position:sticky;top:0;z-index:5;background:var(--bg2);border-bottom:2px solid var(--line);padding:10px 16px}
+.topbar .in-top{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.topbar .ph{font-family:"Maplestory";font-weight:700;font-size:1.15rem}
+.timer{font-family:"Maplestory";font-weight:700;font-variant-numeric:tabular-nums;font-size:1.5rem;background:var(--card);padding:4px 12px;border-radius:12px;border:2px solid var(--line)}
+.timer.low{color:var(--bad);animation:pulse 1s infinite} .timer.zero{color:var(--bad)}
+@keyframes pulse{50%{transform:scale(1.06)}}
+
+/* 큰 안내 */
+.hero{text-align:center;padding:26px 16px}
+.hero .ic{font-size:3.4rem;line-height:1}
+.hero h2{font-size:1.7rem;margin:10px 0 6px}
+.hero p{font-size:1.15rem;margin:6px 0}
+.mission-box{background:var(--bg2);border-radius:16px;padding:18px;font-size:1.35rem;font-family:"Maplestory";font-weight:700;text-align:center;border:2px dashed var(--accent2)}
+
+/* 이름 고르기 */
+.pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}
+.pick button{padding:16px 10px;border-radius:14px;background:var(--card);border:3px solid var(--line);font-size:1.15rem;font-weight:700;color:var(--ink);min-height:62px}
+.pick button.sel{border-color:var(--accent);background:var(--accent);color:#fff}
+.pick button:disabled{opacity:.35}
+
+/* 내 카드 (꾹 누르기) */
+.holdbar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--bg2);border-top:2px solid var(--line);padding:10px 16px;display:flex;justify-content:center;gap:10px}
+.holdbtn{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:14px;
+  padding:12px 20px;font-family:"Maplestory";font-weight:700;font-size:1.05rem;min-height:52px}
+.holdbtn.holding{background:var(--accent);color:#fff}
+.secret{display:none;position:fixed;inset:0;z-index:20;background:rgba(10,10,20,.92);color:#fff;align-items:center;justify-content:center;padding:20px;pointer-events:none}
+.secret.show{display:flex}
+.secret .sc{max-width:520px;width:100%;background:#262046;border-radius:22px;padding:24px;text-align:center;border:3px solid #8c7dff}
+.secret .role{font-family:"Maplestory";font-size:2.4rem;margin:8px 0}
+.secret .sm{font-size:1rem;color:#cfd3f5}
+.secret .box{background:#342c62;border-radius:14px;padding:12px;margin-top:12px;font-size:1.1rem}
+.reveal-zone{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;margin:16px auto;max-width:420px;height:230px;border-radius:24px;
+  background:repeating-linear-gradient(45deg,#7b5cff,#7b5cff 14px,#8f74ff 14px,#8f74ff 28px);color:#fff;display:flex;align-items:center;justify-content:center;
+  font-family:"Maplestory";font-size:1.5rem;box-shadow:var(--shadow);text-align:center;padding:16px}
+.reveal-zone.holding{background:#3b3355}
+
+/* 목록 */
+.names{display:flex;flex-wrap:wrap;gap:6px}
+.names .n{padding:6px 10px;border-radius:10px;background:var(--bg2);font-weight:700}
+.names .n.dead{opacity:.5;text-decoration:line-through}
+table.tbl{width:100%;border-collapse:collapse;font-size:.95rem}
+table.tbl th,table.tbl td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+table.tbl th{font-size:.85rem;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#c9c2b2;margin-right:4px}
+.dot.on{background:#2fa36b}
+.bar{height:22px;border-radius:8px;background:var(--accent2);min-width:4px}
+
+/* 관리자 */
+.adm-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:1000px){.adm-grid{grid-template-columns:1.25fr 1fr}.wrap.wide{max-width:1280px}}
+.guide{font-size:1.15rem;font-weight:700;padding:12px 16px;border-radius:14px;background:var(--bg2);border-left:6px solid var(--accent)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{padding:8px 12px;background:var(--card);color:var(--ink);font-weight:700}
+.seg button.on{background:var(--accent);color:#fff}
+.num{width:84px;padding:8px;border-radius:10px;border:2px solid var(--line);font-size:1.05rem;text-align:center}
+.links{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.links .lk{text-align:center;background:var(--bg2);border-radius:14px;padding:12px}
+.links .lk .q{display:flex;justify-content:center;margin:8px 0;background:#fff;padding:8px;border-radius:10px}
+.links .lk code{display:block;font-size:.75rem;word-break:break-all;margin:6px 0}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--card);border-radius:20px;max-width:560px;width:100%;padding:22px;max-height:90vh;overflow:auto;color:var(--ink)}
+.warn{background:#fff3cd;color:#6b4b00;border-radius:12px;padding:10px 12px;font-weight:700}
+body.m-night .warn{background:#4a3f12;color:#ffe9a6}
+details summary{cursor:pointer;font-weight:700}
+
+/* TV */
+body.tv{overflow:hidden}
+.tv-wrap{height:100vh;display:grid;grid-template-rows:auto 1fr auto;padding:2.2vh 3vw;gap:2vh}
+.tv-top{display:flex;justify-content:space-between;align-items:center;font-family:"Maplestory";font-size:3.4vh;gap:2vw}
+.tv-top .chip{background:var(--card);border:3px solid var(--line);border-radius:2vh;padding:1vh 2vw}
+.tv-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2vh;min-height:0}
+.tv-mid .ic{font-size:11vh;line-height:1}
+.tv-mid h1{font-size:8vh}
+.tv-mid .desc{font-size:4vh;font-weight:700;max-width:90vw}
+.tv-mid .mission{font-family:"Maplestory";font-size:6vh;background:var(--card);border:4px dashed var(--accent2);border-radius:3vh;padding:2.5vh 4vw;max-width:90vw}
+.tv-bot{display:flex;align-items:center;justify-content:center;gap:4vw}
+.tv-bot .bigtimer{font-family:"Maplestory";font-size:14vh;font-variant-numeric:tabular-nums;line-height:1}
+.tv-bot .bigtimer.low{color:var(--bad)}
+.tv-bot .note{font-size:3.4vh;font-weight:700;max-width:50vw}
+.tv-msg{position:fixed;left:50%;top:14vh;transform:translateX(-50%);background:var(--accent);color:#fff;font-family:"Maplestory";font-size:5vh;padding:2vh 4vw;border-radius:3vh;box-shadow:0 1vh 4vh rgba(0,0,0,.3);z-index:9;max-width:90vw;text-align:center}
+.tv-pause{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-family:"Maplestory";font-size:9vh;z-index:10}
+.tv-tally{display:flex;flex-direction:column;gap:1.2vh;width:min(80vw,1100px)}
+.tv-tally .tr{display:grid;grid-template-columns:18vw 1fr 6vw;align-items:center;gap:1.5vw;font-size:3.6vh;font-weight:700}
+.tv-tally .tr .bar{height:4.5vh;border-radius:1vh}
+.tv-tally .tr.out .bar{background:var(--bad)}
+.tv-roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(16vw,1fr));gap:1vh 1vw;width:92vw;max-height:40vh;overflow:hidden}
+.tv-roles .r{background:var(--card);border-radius:1.5vh;padding:.8vh 1vw;font-size:2.6vh;font-weight:700;display:flex;justify-content:space-between;border:2px solid var(--line)}
+.tv-roles .r.mafia{background:#3a2f5e;color:#fff}
+.tv-roles .r.doctor{background:#d9f5ef}
+.tv-roles .r.dead{opacity:.55}
+.tv-names{display:flex;flex-wrap:wrap;gap:1vh;justify-content:center;max-width:90vw;font-size:3vh;font-weight:700}
+.tv-names span{background:var(--card);border-radius:1.2vh;padding:.6vh 1.2vw;border:2px solid var(--line)}
+.tv-qr{background:#fff;padding:1.5vh;border-radius:2vh;display:inline-block}

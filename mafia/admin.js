@@ -557,17 +557,17 @@ function missionsHtml() {
       ${A.view === 'room' && st().phase !== 'lobby' ? '<br>게임 중에 고치면 다음 날 미션부터 바뀐 목록이 쓰여요.' : ''}</p></div>
     <div class="card"><h3>☀️ 공통 미션 <span class="pill">${onC}/${cl.length}개 사용</span></h3>
       <p class="small muted">모두가 함께 하는 미션이에요. "종류"는 어울리는 비밀 미션을 고를 때 써요.</p>
-      <div style="overflow:auto"><table class="tbl"><tr><th>사용</th><th>미션</th><th>종류</th><th></th></tr>${cl.map((m, i) => `<tr>
+      <div style="overflow:auto"><table class="tbl"><tr><th>사용</th><th>미션 · 종류</th><th></th></tr>${cl.map((m, i) => `<tr>
         <td><input type="checkbox" id="mon_c_${m.id}" data-act-change="mOn" data-kind="common" data-id="${m.id}" ${m.on !== false ? 'checked' : ''} ${dis} style="width:22px;height:22px"></td>
-        <td style="min-width:240px"><input class="in mtext" id="mt_c_${m.id}" data-act-change="mText" data-kind="common" data-id="${m.id}" value="${esc(m.text)}" maxlength="80" ${dis}></td>
-        <td>${chips('common', m.id, m.tags)}</td><td>${tools('common', m, i, cl.length)}</td></tr>`).join('')}</table></div>
+        <td style="min-width:260px"><input class="in mtext" id="mt_c_${m.id}" data-act-change="mText" data-kind="common" data-id="${m.id}" value="${esc(m.text)}" maxlength="80" ${dis}>
+          <div style="margin-top:6px">${chips('common', m.id, m.tags)}</div></td><td>${tools('common', m, i, cl.length)}</td></tr>`).join('')}</table></div>
       ${ed ? `<div class="addrow"><b>＋ 새 공통 미션</b><input class="in mtext" id="newC" maxlength="80" placeholder="예: 옆 친구와 손뼉 세 번 마주치기">${chips('common', 'new', A.newTags.common)}<button class="btn sm" data-act="mAdd" data-kind="common">추가</button></div>` : ''}</div>
     <div class="card"><h3>🤫 마피아 비밀 미션 <span class="pill">${onS}/${sl.length}개 사용</span></h3>
       <p class="small muted">마피아가 몰래 하는 행동이에요. 난이도는 설정의 "비밀 미션 난이도"와 맞춰 뽑히고, "어울리는 공통 미션"이 같은 종류인 것이 먼저 뽑혀요.</p>
-      <div style="overflow:auto"><table class="tbl"><tr><th>사용</th><th>미션</th><th>난이도</th><th>어울리는 공통 미션</th><th></th></tr>${sl.map((m, i) => `<tr>
+      <div style="overflow:auto"><table class="tbl"><tr><th>사용</th><th>미션 · 난이도 · 어울리는 공통 미션</th><th></th></tr>${sl.map((m, i) => `<tr>
         <td><input type="checkbox" id="mon_s_${m.id}" data-act-change="mOn" data-kind="secret" data-id="${m.id}" ${m.on !== false ? 'checked' : ''} ${dis} style="width:22px;height:22px"></td>
-        <td style="min-width:200px"><input class="in mtext" id="mt_s_${m.id}" data-act-change="mText" data-kind="secret" data-id="${m.id}" value="${esc(m.text)}" maxlength="80" ${dis}></td>
-        <td>${lvSel('mlv_' + m.id, m.lv, 'mLv')}</td><td>${chips('secret', m.id, m.fit, true)}</td><td>${tools('secret', m, i, sl.length)}</td></tr>`).join('')}</table></div>
+        <td style="min-width:260px"><input class="in mtext" id="mt_s_${m.id}" data-act-change="mText" data-kind="secret" data-id="${m.id}" value="${esc(m.text)}" maxlength="80" ${dis}>
+          <div class="row" style="margin-top:6px;gap:8px">${lvSel('mlv_' + m.id, m.lv, 'mLv')}${chips('secret', m.id, m.fit, true)}</div></td><td>${tools('secret', m, i, sl.length)}</td></tr>`).join('')}</table></div>
       ${ed ? `<div class="addrow"><b>＋ 새 비밀 미션</b><input class="in mtext" id="newS" maxlength="80" placeholder="예: 안경 한 번 고쳐 쓰기">${lvSel('newLvSel', A.newLv, 'newLv')}${chips('secret', 'new', A.newTags.secret, true)}<button class="btn sm" data-act="mAdd" data-kind="secret">추가</button></div>` : ''}</div>`;
 }
 

@@ -93,4 +93,3 @@ module.exports = {
     }
   }
 };
-module.exports.GRACE = GRACE;

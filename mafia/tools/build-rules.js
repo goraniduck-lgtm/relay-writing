@@ -183,7 +183,8 @@ const rules = {
       games: { $cid: { '.write': "auth != null && root.child('raid/classes/' + $cid).exists()" } }
     },
     relay: { '.read': 'auth != null' },   // 예전 데이터 (읽기만 그대로)
-    mafia
+    mafia,
+    auction: require('../../auction/tools/rules.js')   // 자리 경매
   }
 };
 

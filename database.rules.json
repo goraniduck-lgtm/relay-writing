@@ -201,6 +201,80 @@
           }
         }
       }
+    },
+    "auction": {
+      "index": {
+        ".read": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+        ".write": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')"
+      },
+      "rooms": {
+        "$c": {
+          ".read": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+          ".write": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+          "cfg": {
+            ".read": "auth != null"
+          },
+          "core": {
+            ".read": "auth != null",
+            "st": {
+              "t0": {
+                ".validate": "newData.isNumber() && (newData.val() === now || newData.val() === data.val())"
+              },
+              "dur": {
+                ".validate": "newData.isNumber() && newData.val() >= 5 && newData.val() <= 15"
+              }
+            }
+          },
+          "claims": {
+            ".read": "auth != null",
+            "$s": {
+              ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid && root.child('auction/rooms/' + $c + '/cfg/open').val() === true && root.child('auction/rooms/' + $c + '/cfg/roster').child($s).exists() && newData.parent().parent().child('me/' + auth.uid).val() === $s) || (data.child('uid').val() === auth.uid && !newData.exists() && !root.child('auction/rooms/' + $c + '/core/hist').exists() && !newData.parent().parent().child('me/' + auth.uid).exists()))",
+              ".validate": "newData.hasChildren(['uid']) && newData.child('uid').isString()"
+            }
+          },
+          "me": {
+            "$u": {
+              ".read": "auth != null && auth.uid === $u",
+              ".write": "auth != null && auth.uid === $u && ((!data.exists() && newData.isString() && newData.parent().parent().child('claims/' + newData.val() + '/uid').val() === auth.uid) || (data.exists() && !newData.exists() && newData.parent().parent().child('claims/' + data.val() + '/uid').val() !== auth.uid))"
+            }
+          },
+          "pres": {
+            ".read": "auth != null",
+            "$s": {
+              "$u": {
+                ".write": "auth != null && auth.uid === $u && (root.child('auction/rooms/' + $c + '/claims/' + $s + '/uid').val() === auth.uid || !newData.exists())",
+                ".validate": "newData.isNumber()"
+              }
+            }
+          },
+          "req": {
+            "$u": {
+              ".read": "auth != null && auth.uid === $u",
+              ".write": "auth != null && auth.uid === $u",
+              ".validate": "newData.hasChildren(['s', 't']) && newData.child('s').isString() && root.child('auction/rooms/' + $c + '/cfg/roster').child(newData.child('s').val()).exists() && newData.child('t').val() === now"
+            }
+          },
+          "bids": {
+            "$r": {
+              "$s": {
+                ".read": "(auth != null && root.child('auction/rooms/' + $c + '/claims/' + $s + '/uid').val() === auth.uid)",
+                ".write": "(auth != null && root.child('auction/rooms/' + $c + '/claims/' + $s + '/uid').val() === auth.uid) && newData.exists() && root.child('auction/rooms/' + $c + '/core/st/ph').val() === 'bid' && root.child('auction/rooms/' + $c + '/core/st/rid').val() === $r && now <= root.child('auction/rooms/' + $c + '/core/st/t0').val() + root.child('auction/rooms/' + $c + '/core/st/dur').val() * 1000 + 200",
+                ".validate": "newData.hasChildren(['a', 't'])",
+                "a": {
+                  ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5 && newData.val() <= root.child('auction/rooms/' + $c + '/core/coins').child($s).val()"
+                },
+                "t": {
+                  ".validate": "newData.val() === now"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "GRACE": 200
     }
   }
 }

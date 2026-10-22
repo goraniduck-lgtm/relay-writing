@@ -33,3 +33,14 @@
 - 문항: `raid/questions.js` (지금은 예시 문항)
 - 삽화: `raid/img/` 에 정해진 파일 이름으로 넣으면 자동으로 보임 (없으면 기본 배경)
 - 데이터는 같은 Firebase 프로젝트의 `raid/` 아래에 저장 (classes, games)
+
+## 자리 경매 (`auction/`)
+
+- 학생 태블릿: `https://goraniduck-lgtm.github.io/relay-writing/auction/` (참여 코드 → 내 번호)
+- 교사 진행·관리: `https://goraniduck-lgtm.github.io/relay-writing/auction/admin.html` (교사 계정 로그인 → 방 만들기)
+- 교실 TV: `https://goraniduck-lgtm.github.io/relay-writing/auction/tv.html?r=코드`
+- 판정·차감·배정 규칙: `auction/logic.js` (시험: `node auction/tools/test-logic.js`)
+- 데이터는 같은 Firebase 프로젝트의 `auction/` 아래 (방마다 분리). 보안 규칙: `auction/tools/rules.js`
+  → `node mafia/tools/build-rules.js` 로 `database.rules.json`에 합쳐짐
+- 입찰 마감은 서버 시각으로 보안 규칙이 막고, 판정·코인 차감은 마감 뒤 교사 화면이 한 번만(트랜잭션) 실행함
+  → 입찰하는 동안 교사 화면을 켜 두어야 결과가 나옴 (꺼졌다 다시 열면 이어서 판정)

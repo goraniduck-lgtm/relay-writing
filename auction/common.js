@@ -28,6 +28,7 @@ const DB = window.__FAKE_DB__ || (function () {
     return authWait;
   }
   const pres = {};
+  const ref = p => (p ? db.ref(p) : db.ref());   // 빈 경로 = 루트
   return {
     async ready(anon) {
       const u = await waitAuth();
@@ -45,18 +46,18 @@ const DB = window.__FAKE_DB__ || (function () {
     logout: () => auth.signOut(),
     now: () => Date.now() + offset,
     on(path, cb, err) {
-      const r = db.ref(path);
+      const r = ref(path);
       const h = r.on('value', s => cb(s.val()), e => { if (err) err(e); else console.warn(path, e); });
       return () => r.off('value', h);
     },
-    get: path => db.ref(path).get().then(s => s.val()),
-    set: (path, v) => db.ref(path).set(v),
-    update: (path, obj) => db.ref(path).update(obj),
-    remove: path => db.ref(path).remove(),
+    get: path => ref(path).get().then(s => s.val()),
+    set: (path, v) => ref(path).set(v),
+    update: (path, obj) => ref(path).update(obj),
+    remove: path => ref(path).remove(),
     /* fn(cur) → 새 값, undefined면 취소. 로컬 캐시가 비어 있으면 null로 한 번 불리므로 null은 그대로 돌려 서버 값으로 다시 계산 */
     tx(path, fn) {
       return new Promise((resolve, reject) => {
-        db.ref(path).transaction(cur => (cur === null ? null : fn(cur)), (e, committed, snap) => {
+        ref(path).transaction(cur => (cur === null ? null : fn(cur)), (e, committed, snap) => {
           if (e) reject(e); else resolve({ committed, val: snap ? snap.val() : null });
         }, false);
       });

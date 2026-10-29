@@ -199,4 +199,38 @@ function startTicker(getState) {
   }, 250);
 }
 
+
+/* ---------- 탈락 발표 ---------- */
+const OUT_CAUSE = { day: '시민 투표', night: '마피아의 공격', fix: '선생님 처리' };
+const OUT_ICON = { day: '🗳️', night: '🌙', fix: '🛠' };
+/* 이번 단계(낮 결과·아침)에 탈락한 사람 */
+function stepDeath(pub) {
+  const s = (pub && pub.state) || {}; const r = (pub && pub.rounds && pub.rounds[s.round]) || {};
+  if (s.phase === 'dayResult') { const d = (r.day || {})['s' + s.stage] || {}; return d.out ? { id: d.out, t: 'day', reason: d.reason } : { id: null, t: 'day', reason: d.reason }; }
+  if (s.phase === 'morning') { const out = r.night && r.night.out; return { id: out || null, t: 'night' }; }
+  return null;
+}
+function deathSentence(pub, id, t) {
+  const n = esc(pname(pub, id));
+  return t === 'night' ? `${OUT_ICON.night} 마피아의 공격으로 <b>${n}</b>이(가) 탈락했어요.`
+    : t === 'day' ? `${OUT_ICON.day} 시민 투표로 <b>${n}</b>이(가) 탈락했어요.` : `<b>${n}</b>이(가) 탈락했어요.`;
+}
+/* 탈락 순서 (게임 끝 화면에서 왜 이기고 졌는지 보기) — roles는 끝난 뒤에만 넘김 */
+function deathList(pub) {
+  return Object.entries((pub && pub.players) || {}).filter(([, p]) => !p.alive && p.out)
+    .map(([id, p]) => ({ id, name: p.name, r: p.out.r || 0, t: p.out.t }))
+    .sort((a, b) => a.r - b.r || (a.t === 'night') - (b.t === 'night'));
+}
+function deathTimelineHtml(pub, roles, big) {
+  const list = deathList(pub);
+  if (!list.length) return '';
+  return `<div class="timeline ${big ? 'big' : ''}"><h3>💀 탈락 순서</h3>${list.map((d, i) => `<div class="tl ${i === list.length - 1 ? 'last' : ''}">
+    <span class="when">${d.r}일째 ${d.t === 'night' ? '밤' : d.t === 'day' ? '낮' : ''}</span>
+    <span class="who">${esc(d.name)}${roles && roles[d.id] ? ` <span class="pill ${roles[d.id]}">${Logic.ROLES[roles[d.id]].name}</span>` : ''}</span>
+    <span class="why">${OUT_ICON[d.t] || ''} ${OUT_CAUSE[d.t] || ''}</span></div>`).join('')}</div>`;
+}
+
+/* ---------- 학생 전체 화면 (기본 ON, 교사가 끌 수 있음: pub/opt/fs) ---------- */
+const fsOnFor = pub => !(pub && pub.opt && pub.opt.fs === false);
+
 window.addEventListener('unhandledrejection', e => { console.warn(e.reason); });

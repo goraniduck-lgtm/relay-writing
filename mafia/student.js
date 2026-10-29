@@ -19,6 +19,43 @@ const st = () => (S.pub && S.pub.state) || {};
 const me = () => (S.pub && S.pub.players && S.pid && S.pub.players[S.pid]) || null;
 const amAlive = () => !!(me() && me().alive);
 
+/* ---------- 전체 화면 고정 ----------
+   입장한 뒤에는 전체 화면에서만 게임 화면이 보임. 나가면(스와이프·뒤로 가기 등) 덮개가 떠서 한 번 누르면 돌아옴.
+   전체 화면을 지원하지 않는 기기(또는 거부)는 덮개 없이 진행. 교사가 끄면(pub/opt/fs=false) 덮개 없음. */
+const FS = {
+  can: !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen),
+  failed: false
+};
+const inFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const fsWanted = () => !window.__NO_FS__ && !qp.has('nofs') && FS.can && !FS.failed && !!S.pid && fsOnFor(S.pub) && st().phase !== 'end';
+function enterFs() {
+  if (!FS.can || inFs()) return;
+  const el = document.documentElement;
+  try {
+    const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen();
+    if (p && p.catch) p.catch(() => { FS.failed = true; renderGate(); });
+  } catch (e) { FS.failed = true; }
+}
+function renderGate() {
+  const show = fsWanted() && !inFs();
+  document.documentElement.classList.toggle('fs-lock', !!S.pid);
+  let g = document.getElementById('fsGate');
+  if (show && !g) {
+    g = document.createElement('button'); g.id = 'fsGate'; g.className = 'fs-gate';
+    g.innerHTML = '<div class="ic">🕶️</div><h2>교실 마피아</h2><p>게임은 전체 화면으로만 할 수 있어요.</p><div class="tap">👆 화면을 눌러 돌아가기</div>';
+    g.addEventListener('click', enterFs);
+    document.body.appendChild(g);
+  } else if (!show && g) g.remove();
+}
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, renderGate));
+/* 뒤로 가기(스와이프 포함) 막기 */
+history.pushState({ mafia: 1 }, '');
+window.addEventListener('popstate', () => {
+  history.pushState({ mafia: 1 }, '');
+  if (S.pid && st().phase !== 'end') toast('게임 중에는 나갈 수 없어요.');
+});
+window.addEventListener('beforeunload', e => { if (S.pid && st().phase && st().phase !== 'lobby' && st().phase !== 'end') { e.preventDefault(); e.returnValue = ''; } });
+
 /* ---------- 시작 ---------- */
 (async function boot() {
   startTicker(() => st());
@@ -61,6 +98,7 @@ function syncListeners() {
 /* ---------- 행동 ---------- */
 async function joinRoom(name) {
   name = String(name || '').trim();
+  if (name && !window.__NO_FS__ && !qp.has('nofs')) enterFs();
   if (!name) { toast('이름이나 번호를 적어 주세요.'); return; }
   if (name.length > 20) { toast('20글자 안으로 적어 주세요.'); return; }
   const k = nameKey(name);
@@ -170,7 +208,7 @@ function render() {
   if (!amAlive() && s.phase !== 'end' && s.phase !== 'lobby') html += spectatorHtml();
   else html += (VIEWS[s.phase] || VIEWS.lobby)();
   paint(main, html);
-  renderHold(); renderCard();
+  renderHold(); renderCard(); renderGate();
 }
 
 function codeHtml() {
@@ -297,7 +335,8 @@ const VIEWS = {
     const s = st(); const r = (S.pub.rounds || {})[s.round] || {};
     const out = r.night && r.night.out;
     return `<div class="card hero"><div class="ic">🌅</div><h2>아침이 밝았어요</h2>
-      <p style="font-size:1.4rem">${out ? `지난밤 <b>${esc(pname(S.pub, out))}</b>이(가) 탈락했어요.` : '지난밤 아무도 탈락하지 않았어요.'}</p>
+      ${out ? deathBox(deathSentence(S.pub, out, 'night'), out === S.pid ? '나는 이제 관전 모드로 바뀌어요. 말이나 몸짓으로 힌트를 주면 안 돼요.' : '탈락한 친구의 역할은 게임이 끝날 때 공개돼요.')
+        : deathBox('지난밤 <b>아무도 탈락하지 않았어요.</b>', '', true)}
       <p class="muted">살아 있는 친구 ${aliveList(S.pub).length}명</p></div>`;
   },
   limit() { return `<div class="card hero"><div class="ic">⏳</div><h2>약속한 라운드가 끝났어요</h2><p>선생님이 게임을 끝낼지, 더 할지 정하고 있어요.</p></div>`; },
@@ -320,14 +359,17 @@ function dayResultHtml(round, stage) {
   const tallyRows = Object.entries(res.tally || {}).sort((a, b) => b[1] - a[1]);
   const max = tallyRows.length ? tallyRows[0][1] : 1;
   let head;
-  if (res.reason === 'top') head = `<b>${esc(pname(S.pub, res.out))}</b>이(가) 탈락했어요.`;
-  else if (res.reason === 'tie') head = '동점이에요! 동점인 친구들만 두고 <b>재투표</b>를 해요.';
-  else if (res.reason === 'tie2') head = '재투표도 동점이라 오늘은 <b>아무도 탈락하지 않았어요.</b>';
-  else head = '투표가 없어서 오늘은 <b>아무도 탈락하지 않았어요.</b>';
-  return `<div class="hero" style="padding:8px"><div class="ic">📢</div><h2>${stage == 2 ? '재투표 결과' : '투표 결과'}</h2><p style="font-size:1.25rem">${head}</p></div>
+  if (res.reason === 'top') head = deathBox(deathSentence(S.pub, res.out, 'day'), res.out === S.pid ? '나는 이제 관전 모드로 바뀌어요. 말이나 몸짓으로 힌트를 주면 안 돼요.' : '탈락한 친구의 역할은 게임이 끝날 때 공개돼요.');
+  else if (res.reason === 'tie') head = deathBox('동점이에요! 동점인 친구들만 두고 <b>재투표</b>를 해요.', '', true);
+  else if (res.reason === 'tie2') head = deathBox('재투표도 동점이라 오늘은 <b>아무도 탈락하지 않았어요.</b>', '', true);
+  else head = deathBox('투표가 없어서 오늘은 <b>아무도 탈락하지 않았어요.</b>', '', true);
+  return `<div class="hero" style="padding:8px"><h2>📢 ${stage == 2 ? '재투표 결과' : '투표 결과'}</h2></div>${head}
     <table class="tbl">${tallyRows.map(([id, n]) => `<tr><td style="width:30%"><b>${esc(pname(S.pub, id))}</b></td><td><div class="bar" style="width:${n / max * 100}%"></div></td><td style="width:50px">${n}표</td></tr>`).join('')}</table>`;
 }
 
+function deathBox(text, sub, none) {
+  return `<div class="death ${none ? 'none' : ''}"><div class="ic">${none ? '🕊️' : '💀'}</div><div class="txt">${text}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+}
 function spectatorHtml() {
   const s = st();
   const r = s.round || 0;
@@ -341,7 +383,8 @@ function spectatorHtml() {
   if (s.phase === 'mission') phaseInfo = `<div class="mission-box" style="margin-top:10px">${esc(s.mission || '')}</div>`;
   if (s.phase === 'dayResult') phaseInfo = dayResultHtml(r, s.stage);
   if (s.phase === 'morning') phaseInfo = VIEWS.morning();
-  return `<div class="card"><h2>👻 관전 모드</h2><p>탈락했어요. 이제 말하거나 몸짓으로 힌트를 주면 안 돼요. 대신 마피아를 맞혀 보세요!</p>
+  const myOut = me() && me().out;
+  return `<div class="card"><h2>👻 관전 모드</h2><p>${myOut ? `나는 ${myOut.r}일째 <b>${OUT_CAUSE[myOut.t] || ''}</b>(으)로 탈락했어요. ` : '탈락했어요. '}이제 말하거나 몸짓으로 힌트를 주면 안 돼요. 대신 마피아를 맞혀 보세요!</p>
       <div class="row"><span class="pill">${r}일째</span><span class="pill">${ph.icon} ${esc(ph.name)}</span><span class="pill">생존 ${alive.length}명</span></div>${phaseInfo}</div>
     <div class="card"><h3>🔍 마피아 예측 (${r}일째)</h3><p class="small muted">마피아 같은 친구를 여러 명 골라도 돼요. 게임이 끝나면 정답과 비교해요. 게임에는 영향이 없어요.</p>
       <div class="pick">${alive.map(p => `<button data-act="predPick" data-id="${p.id}" class="${S.predPick[p.id] ? 'sel' : ''}">${esc(p.name)}</button>`).join('')}</div>
@@ -372,6 +415,7 @@ function endHtml() {
       ${myTeam ? `<p style="font-size:1.2rem">나는 <b>${Logic.ROLES[S.role].name}</b>였어요.</p>` : ''}
       <p>남은 인원 — 시민 팀 ${e.alive ? e.alive.citizen : '?'}명 / 마피아 팀 ${e.alive ? e.alive.mafia : '?'}명</p>
       ${e.rate ? `<p>생존율 — 시민 팀 ${e.rate.citizen}% / 마피아 팀 ${e.rate.mafia}%</p>` : ''}</div>
+    <div class="card">${deathTimelineHtml(S.pub, roles)}</div>
     ${predHtml}
     <div class="card"><h3>모두의 역할</h3><div class="names" style="margin-top:8px">${rows.map(p => `<span class="n ${p.alive ? '' : 'dead'}"><span class="pill ${p.role || ''}">${p.role ? Logic.ROLES[p.role].name : '?'}</span> ${esc(p.name)}</span>`).join('')}</div></div>`;
 }

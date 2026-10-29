@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>교실 마피아 — TV</title>
-<link rel="stylesheet" href="style.css?v=20261030084503">
+<link rel="stylesheet" href="style.css?v=20261030085517">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -13,9 +13,9 @@
 <body class="tv m-lobby">
 <div id="tv"><div class="tv-wrap"><div></div><div class="tv-mid"><div class="ic">📺</div><h1>교실 마피아</h1><p class="desc" id="tvLoading">불러오는 중…</p></div><div></div></div></div>
 <div id="ov"></div>
-<script src="missions.js?v=20261030084503"></script>
-<script src="logic.js?v=20261030084503"></script>
-<script src="common.js?v=20261030084503"></script>
+<script src="missions.js?v=20261030085517"></script>
+<script src="logic.js?v=20261030085517"></script>
+<script src="common.js?v=20261030085517"></script>
 <script>
 /* 교실 TV — 공개 정보(pub)만 읽음. 조작 기능 없음 */
 const T = { code: (qp.get('r') || '').toUpperCase(), pub: undefined, online: true };
@@ -71,8 +71,8 @@ function render() {
     case 'dayResult': {
       const d = (r.day || {})['s' + s.stage] || {};
       const rows = Object.entries(d.tally || {}).sort((a, b) => b[1] - a[1]); const max = rows.length ? rows[0][1] : 1;
-      const head = { top: `${esc(pname(p, d.out))} 탈락`, tie: '동점! 재투표해요', tie2: '재투표도 동점 — 아무도 탈락하지 않았어요', novote: '아무도 탈락하지 않았어요' }[d.reason] || '';
-      mid = `<h1>📢 ${head}</h1><div class="tv-tally">${rows.slice(0, 8).map(([id, n]) => `<div class="tr ${id === d.out ? 'out' : ''}"><span>${esc(pname(p, id))}</span><div class="bar" style="width:${n / max * 100}%"></div><span>${n}표</span></div>`).join('')}</div>`;
+      const head = { top: `🗳️ 시민 투표로 <b>${esc(pname(p, d.out))}</b>이(가) 탈락했어요`, tie: '동점! 재투표해요', tie2: '재투표도 동점 — 아무도 탈락하지 않았어요', novote: '아무도 탈락하지 않았어요' }[d.reason] || '';
+      mid = `<div class="tv-death ${d.reason === 'top' ? '' : 'none'}">${d.reason === 'top' ? '💀 ' : ''}${head}</div><div class="tv-tally">${rows.slice(0, 8).map(([id, n]) => `<div class="tr ${id === d.out ? 'out' : ''}"><span>${esc(pname(p, id))}</span><div class="bar" style="width:${n / max * 100}%"></div><span>${n}표</span></div>`).join('')}</div>`;
       note = d.reason === 'top' ? '탈락한 친구의 역할은 게임이 끝날 때 공개돼요' : ''; break;
     }
     case 'night':
@@ -80,7 +80,7 @@ function render() {
       note = '조용히! 고개를 숙이고 내 화면만 봐요'; break;
     case 'morning': {
       const out = r.night && r.night.out;
-      mid = `<div class="ic">🌅</div><h1>아침이 밝았어요</h1><p class="desc" style="font-size:6vh">${out ? `지난밤 <b>${esc(pname(p, out))}</b>이(가) 탈락했어요.` : '지난밤 아무도 탈락하지 않았어요.'}</p><p class="desc">살아 있는 친구 ${alive}명</p>`;
+      mid = `<h1>🌅 아침이 밝았어요</h1><div class="tv-death ${out ? '' : 'none'}">${out ? `💀 🌙 마피아의 공격으로<br><b>${esc(pname(p, out))}</b>이(가) 탈락했어요` : '🕊️ 지난밤 아무도 탈락하지 않았어요'}</div><p class="desc">살아 있는 친구 ${alive}명</p>`;
       note = '다음 날을 준비해요'; break;
     }
     case 'limit':
@@ -92,7 +92,9 @@ function render() {
       mid = `<h1>🏁 ${WINNER_TEXT[e.winner] || '게임 종료'}</h1>
         <p class="desc">${esc(END_METHOD[e.method] || '')} · 남은 인원 시민 팀 ${e.alive ? e.alive.citizen : '?'}명 · 마피아 팀 ${e.alive ? e.alive.mafia : '?'}명
         ${e.rate ? `<br>생존율 시민 팀 ${e.rate.citizen}% · 마피아 팀 ${e.rate.mafia}%` : ''}</p>
-        <div class="tv-roles">${rows.map(x => `<div class="r ${x.role || ''} ${x.alive ? '' : 'dead'}"><span>${esc(x.name)}</span><span>${x.role ? Logic.ROLES[x.role].emoji + ' ' + Logic.ROLES[x.role].name : ''}</span></div>`).join('')}</div>`;
+        <div class="row" style="gap:3vw;align-items:flex-start;width:92vw;justify-content:center">
+        <div style="flex:0 0 32vw;background:var(--card);border-radius:2vh;padding:1vh 1.5vw;max-height:52vh;overflow:hidden">${deathTimelineHtml(p, e.roles, true)}</div>
+        <div class="tv-roles" style="flex:1;width:auto">${rows.map(x => `<div class="r ${x.role || ''} ${x.alive ? '' : 'dead'}"><span>${esc(x.name)}</span><span>${x.role ? Logic.ROLES[x.role].emoji + ' ' + Logic.ROLES[x.role].name : ''}</span></div>`).join('')}</div></div>`;
       break;
     }
   }
@@ -101,6 +103,12 @@ function render() {
   const q = document.getElementById('joinQr'); if (q && !q.dataset.done) { qr(q, studentUrl(T.code).replace('tv.html', ''), Math.round(window.innerHeight * 0.3)); q.dataset.done = 1; }
   paint(document.getElementById('ov'), (s.paused ? '<div class="tv-pause">⏸ 잠시 멈춤</div>' : '') + (s.msg && s.msg.text ? `<div class="tv-msg">📣 ${esc(s.msg.text)}</div>` : '') + (!T.online ? '<div class="tv-msg" style="top:auto;bottom:4vh;background:#555;font-size:3vh">연결을 다시 잇는 중…</div>' : ''));
 }
+/* TV는 화면을 한 번 누르면 전체 화면 */
+document.addEventListener('click', () => { const el = document.documentElement; if (!(document.fullscreenElement || document.webkitFullscreenElement)) { try { const r = el.requestFullscreen ? el.requestFullscreen() : el.webkitRequestFullscreen && el.webkitRequestFullscreen(); if (r && r.catch) r.catch(() => {}); } catch (e) {} } });
+function fsHint() { let h = document.getElementById('fsHint'); const need = !(document.fullscreenElement || document.webkitFullscreenElement);
+  if (need && !h) { h = document.createElement('div'); h.id = 'fsHint'; h.style.cssText = 'position:fixed;right:1.5vw;bottom:1.5vh;background:rgba(0,0,0,.55);color:#fff;padding:.8vh 1.2vw;border-radius:1vh;font-size:2vh;z-index:11'; h.textContent = '화면을 누르면 전체 화면'; document.body.appendChild(h); }
+  else if (!need && h) h.remove(); }
+['fullscreenchange', 'webkitfullscreenchange'].forEach(e => document.addEventListener(e, fsHint)); fsHint();
 window.addEventListener('resize', () => { const q = document.getElementById('joinQr'); if (q) { q.dataset.done = ''; render(); } });
 </script>
 </body>

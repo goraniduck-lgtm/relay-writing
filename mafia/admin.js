@@ -249,20 +249,17 @@ async function tallyVote() {
   const pl = players();
   const res = Logic.tally(votes, (v, t) => pl[v] && pl[v].alive && pl[t] && pl[t].alive && v !== t && (stage == 1 || (s.cands && s.cands[t])));
   const out = Logic.dayOutcome(Number(stage), res);
-  let judge = null;
   const won = await tx(p => p.state.phase === 'vote' && !p.state.open && p.state.round === r && p.state.stage === stage, n => {
     n.rounds = n.rounds || {}; n.rounds[r] = n.rounds[r] || {}; n.rounds[r].day = n.rounds[r].day || {};
     n.rounds[r].day['s' + stage] = { tally: res.tally, top: toMap(res.top), reason: out.reason, out: out.out || null, cands: out.cands ? toMap(out.cands) : null, n: Object.keys(votes).length };
     if (out.out) { n.players[out.out].alive = false; n.players[out.out].out = { r, t: 'day' }; n.rounds[r].dayOut = out.out; }
     n.state.phase = 'dayResult'; n.state.open = false; n.state.timer = null;
-    const w = Logic.normalWinner(aliveCounts(n.players));
-    if (w) { judge = { winner: w, method: 'normal' }; goEnd(n, judge); }
+    // 승패가 정해져도 바로 끝내지 않음: 모두에게 탈락 발표를 먼저 보여 준 뒤 사회자가 '게임 결과 보기'를 누름
   });
   if (!won) return;
   const up = { [`log/r${r}/day/s${stage}`]: { tally: res.tally, reason: out.reason, out: out.out || null, votes: Object.keys(votes).length, alive: aliveList(A.pub).length } };
   if (out.out) up[`log/r${r}/dayOut`] = out.out;
   Object.assign(up, snapshot(r, won.players));
-  if (judge) up['log/end'] = won.end;
   await DB.update(R(), up).catch(() => {});
 }
 function unvoted() {
@@ -311,19 +308,15 @@ async function resolveNight() {
   const atk = attackersOf(r, pl); const doc = doctorOf(pl);
   const docT = doc && nv.d ? nv.d[doc] || null : null;
   const res = Logic.nightOutcome(nv.m || {}, atk, pl, A.roles || {}, docT);
-  let judge = null;
   const won = await tx(p => p.state.phase === 'night' && !p.state.open && p.state.round === r, n => {
     n.rounds = n.rounds || {}; n.rounds[r] = n.rounds[r] || {};
     n.rounds[r].night = { out: res.out || null };
     if (res.out) { n.players[res.out].alive = false; n.players[res.out].out = { r, t: 'night' }; }
     n.state.phase = 'morning'; n.state.timer = null;
-    const w = Logic.normalWinner(aliveCounts(n.players));
-    if (w) { judge = { winner: w, method: 'normal' }; goEnd(n, judge); }
   });
   if (!won) return;
   const up = { [`log/r${r}/night`]: { target: res.target, protect: res.protect, saved: res.saved, out: res.out, attackers: toMap(atk), votes: nv.m || {}, tieBreak: res.tieBreak } };
   Object.assign(up, snapshot(r, won.players));
-  if (judge) up['log/end'] = won.end;
   await DB.update(R(), up).catch(() => {});
 }
 /* 라운드 기록: 비밀 미션 결과 + 진영별 생존 */
@@ -339,6 +332,16 @@ function snapshot(r, pl) {
   return up;
 }
 
+/* 탈락 발표 뒤 일반 종료 (낮 결과·아침 화면에서) */
+const winNow = () => Logic.normalWinner(aliveCounts(players()));
+async function showEnd() {
+  const s = st();
+  const won = await tx(p => p.state.seq === s.seq && (p.state.phase === 'dayResult' || p.state.phase === 'morning'), n => {
+    const w = Logic.normalWinner(aliveCounts(n.players));
+    if (w) goEnd(n, { winner: w, method: 'normal' });
+  });
+  if (won && won.end) await DB.update(R(), { 'log/end': won.end }).catch(() => {});
+}
 async function nextDayOrLimit() {
   const s = st();
   if ((s.round || 0) >= (s.maxR || cfg().run.maxR)) {
@@ -648,7 +651,7 @@ const GUIDE = {
   think: '개인 추리 시간이에요. 끝나면 시민 회의를 시작하세요.',
   meeting: '시민 회의를 진행하세요. 발언 순서를 정해 주세요. 끝나면 투표를 시작하세요.',
   vote: '투표 중이에요. 다 내면 투표를 마감하세요.',
-  dayResult: '투표 결과를 발표하세요.',
+  dayResult: '투표 결과와 탈락한 친구를 발표하세요.',
   night: '밤이에요. 마피아와 의사의 선택을 기다리세요.',
   morning: '다음 날 아침 결과를 발표하세요.',
   limit: '정한 라운드가 끝났어요. 선생님이 끝낼지 더 할지 정해요.',
@@ -662,6 +665,7 @@ function guideHtml() {
   if (s.phase === 'meeting' && remaining(s) === 0) g = '회의를 마무리하세요. 그리고 투표를 시작하세요.';
   if (s.phase === 'mission' && remaining(s) === 0) g = '미션 시간이 끝났어요. 개인 추리로 넘어가세요.';
   if (s.phase === 'limit' && !isT()) g = '정한 라운드가 끝났어요. 선생님의 결정을 기다리세요.';
+  if ((s.phase === 'dayResult' || s.phase === 'morning') && winNow()) g = '탈락 발표를 먼저 하고, [게임 결과 보기]를 누르세요.';
   return `<div class="guide" style="margin-top:12px">🧭 ${esc(g)}${s.timer && remaining(s) === 0 ? ' <span class="pill bad">⏰ 시간 끝</span>' : ''}</div>`;
 }
 
@@ -693,14 +697,14 @@ function phasePanel() {
       const d = (((A.pub.rounds || {})[s.round] || {}).day || {})['s' + s.stage] || {};
       return card(dayResultView(s.round, s.stage)) + card(d.reason === 'tie' && s.stage === 1
         ? `<button class="btn big" data-act="startRevote">🔁 재투표 시작 (동점자만)</button>`
-        : `<button class="btn big dark" data-act="startNight">🌙 밤 시작 (${cfg().run.times.night}초)</button>`) + secretPanel();
+        : winNow() ? endButton() : `<button class="btn big dark" data-act="startNight">🌙 밤 시작 (${cfg().run.times.night}초)</button>`) + secretPanel();
     }
     case 'night': return nightPanel();
     case 'morning': {
       const out = (((A.pub.rounds || {})[s.round] || {}).night || {}).out;
       const last = (s.round || 0) >= (s.maxR || cfg().run.maxR);
-      return card(`<h3>🌅 아침 발표</h3><p style="font-size:1.3rem">${out ? `지난밤 <b>${esc(pname(A.pub, out))}</b> 탈락` : '지난밤 아무도 탈락하지 않았어요.'}</p>${nightDetail(s.round)}`)
-        + card(last ? `<p>정한 ${s.maxR}라운드가 끝났어요.</p><button class="btn big" data-act="toLimit">⏳ 라운드 종료 → 선생님 결정</button>`
+      return card(`<h3>🌅 아침 발표</h3><p style="font-size:1.3rem">${out ? `🌙 마피아의 공격으로 <b>${esc(pname(A.pub, out))}</b> 탈락` : '지난밤 아무도 탈락하지 않았어요.'}</p>${nightDetail(s.round)}`)
+        + card(winNow() ? endButton() : last ? `<p>정한 ${s.maxR}라운드가 끝났어요.</p><button class="btn big" data-act="toLimit">⏳ 라운드 종료 → 선생님 결정</button>`
           : `${missionChooser(`${s.round + 1}일째 공통 미션`)}<button class="btn big" data-act="startDay">☀️ ${s.round + 1}일째 낮 시작</button>`);
     }
     case 'limit': return card(isT() ? `<h3>⏳ ${s.round}라운드 완료 — 어떻게 할까요?</h3>${statusCounts()}
@@ -712,6 +716,10 @@ function phasePanel() {
   return '';
 }
 
+function endButton() {
+  return `<p class="warn">이번 탈락으로 게임이 끝나는 조건이 됐어요. 모두가 탈락 발표를 본 뒤 눌러 주세요.</p>
+    <button class="btn big bad" data-act="showEnd" style="margin-top:10px">🏁 게임 결과 보기</button>`;
+}
 function statusCounts() {
   const a = aliveCounts(players()), i = initCounts();
   return `<div class="kv"><span>시민 팀</span><b>${a.citizen}/${i.citizen}명 (${pct(a.citizen, i.citizen)}%)</b><span>마피아 팀</span><b>${a.mafia}/${i.mafia}명 (${pct(a.mafia, i.mafia)}%)</b></div>`;
@@ -765,7 +773,7 @@ function dayResultView(r, stage) {
   if (!d) return '<p>결과 없음</p>';
   const rows = Object.entries(d.tally || {}).sort((a, b) => b[1] - a[1]);
   const max = rows.length ? rows[0][1] : 1;
-  const head = { top: `<b>${esc(pname(A.pub, d.out))}</b> 탈락`, tie: '동점 → 재투표', tie2: '재투표도 동점 → 아무도 탈락하지 않음', novote: '유효표 없음 → 아무도 탈락하지 않음' }[d.reason];
+  const head = { top: `🗳️ 시민 투표로 <b>${esc(pname(A.pub, d.out))}</b> 탈락`, tie: '동점 → 재투표', tie2: '재투표도 동점 → 아무도 탈락하지 않음', novote: '유효표 없음 → 아무도 탈락하지 않음' }[d.reason];
   return `<h3>📢 ${stage === 2 ? '재투표' : '투표'} 결과 (${d.n || 0}표)</h3><p style="font-size:1.3rem">${head}</p>
     <table class="tbl">${rows.map(([id, n]) => `<tr><td style="width:30%">${esc(pname(A.pub, id))}</td><td><div class="bar" style="width:${n / max * 100}%"></div></td><td>${n}표</td></tr>`).join('')}</table>`;
 }
@@ -793,7 +801,8 @@ function endView() {
   return `<div class="hero"><div class="ic">🏁</div><h2>${WINNER_TEXT[e.winner]}</h2><p class="muted">${END_METHOD[e.method]} · ${e.round}일째</p>
     <p>남은 인원 — 시민 팀 ${e.alive.citizen}/${e.init.citizen}명 · 마피아 팀 ${e.alive.mafia}/${e.init.mafia}명</p>
     ${e.rate ? `<p>생존율 — 시민 ${e.rate.citizen}% · 마피아 ${e.rate.mafia}%</p>` : ''}</div>
-    <div class="names">${Object.entries(pl).sort((a, b) => byName(a[1], b[1])).map(([id, p]) => `<span class="n ${p.alive ? '' : 'dead'}"><span class="pill ${e.roles[id]}">${Logic.ROLES[e.roles[id]] ? Logic.ROLES[e.roles[id]].name : '?'}</span> ${esc(p.name)}</span>`).join('')}</div>`;
+    <div class="names">${Object.entries(pl).sort((a, b) => byName(a[1], b[1])).map(([id, p]) => `<span class="n ${p.alive ? '' : 'dead'}"><span class="pill ${e.roles[id]}">${Logic.ROLES[e.roles[id]] ? Logic.ROLES[e.roles[id]].name : '?'}</span> ${esc(p.name)}</span>`).join('')}</div>
+    ${deathTimelineHtml(A.pub, e.roles)}`;
 }
 
 function sidePanel() {
@@ -881,6 +890,7 @@ function settingsHtml() {
       <span>미션 확인</span>${seg('run/confirm', c.run.confirm, [['single', '사회자 단독'], ['joint', '사회자·교사 공동']], ro)}
       <span>사회자</span>${seg('run/host', c.run.host, [['teacher', '교사'], ['student', '학생']], ro)}
       <span>비밀 미션 난이도</span><select class="num" style="width:auto" id="diffSel" data-act-change="diff">${Object.entries(MISSIONS.DIFF).map(([k, v]) => `<option value="${k}" ${c.run.diff === k ? 'selected' : ''}>${v.name}</option>`).join('')}</select>
+      <span>학생 전체 화면</span><span class="row"><div class="seg"><button class="${fsOnFor(A.pub) ? 'on' : ''}" data-act="${fsOnFor(A.pub) ? '' : 'fsToggle'}" ${ro ? 'disabled' : ''}>고정 ON</button><button class="${fsOnFor(A.pub) ? '' : 'on'}" data-act="${fsOnFor(A.pub) ? 'fsToggle' : ''}" ${ro ? 'disabled' : ''}>OFF</button></div><span class="small muted">전체 화면에서 나가면 게임 화면이 가려져요</span></span>
       <span>최대 라운드</span><span class="row"><input class="num" type="number" min="1" max="20" id="maxR" value="${c.run.maxR}" ${ro ? 'disabled' : ''} data-act-change="maxR"> 라운드</span>
     </div>
     ${ro ? '<p class="small muted">역할·라운드 설정은 선생님만 바꿀 수 있어요.</p>' : ''}
@@ -931,6 +941,7 @@ document.addEventListener('click', e => {
     tab: () => { A.tab = id; syncRound(); render(); }, toggleRoles: () => { A.showRoles = !A.showRoles; render(); },
     startGame, startDay: () => startDay(false), extendRound: () => startDay(true), toThink, toMeeting, toVote,
     closeVote: () => closeVote(false), closeVoteForce: () => closeVote(true), tallyVote, startRevote, startNight,
+    showEnd, fsToggle: () => DB.set(R() + '/pub/opt/fs', !fsOnFor(A.pub)).catch(fail()),
     closeNight: () => closeNight(false), closeNightForce: () => closeNight(true), resolveNight, toLimit: nextDayOrLimit,
     endPreview: () => endPreview(id), endConfirm: () => endConfirm(id), restart,
     pause: pauseToggle, extend, msg: () => setMsg(id), msgOff: () => setMsg(null),

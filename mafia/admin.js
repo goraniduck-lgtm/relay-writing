@@ -476,7 +476,7 @@ function listenLib() {
 }
 /* 교사가 방을 열면: 방 목록이 없거나, 아직 준비 단계면 기본 목록으로 맞춤 */
 function syncRoomMissions() {
-  if (!isT() || A.view !== 'room' || !A.lib || !A.cfgLoaded || A.pub === undefined) return;
+  if (!isT() || A.view !== 'room' || !A.lib || !A.cfgLoaded || !A.pub) return;   // 방이 지워졌으면(pub 없음) 다시 만들지 않음
   const room = A.cfg && A.cfg.missions;
   if (!room || (st().phase === 'lobby' && JSON.stringify(room) !== JSON.stringify(A.lib))) DB.set(R() + '/cfg/missions', A.lib).catch(() => {});
 }

@@ -171,7 +171,6 @@ function render() {
   else html += (VIEWS[s.phase] || VIEWS.lobby)();
   paint(main, html);
   renderHold(); renderCard();
-  bindHold(document.body);
 }
 
 function codeHtml() {
@@ -197,28 +196,41 @@ function joinHtml() {
 /* 아래 고정 버튼 — 모든 역할에 똑같이 보임 */
 function renderHold() {
   const show = S.pid && st().phase && st().phase !== 'lobby' && st().phase !== 'end' && S.role;
-  paint($('#hold'), show ? `<div class="holdbar"><button class="holdbtn" data-hold="secretCard">🃏 꾹 누르면 내 카드가 보여요</button></div>` : '');
-  bindHold(document.body);
+  paint($('#hold'), show ? `<div class="holdbar"><button class="holdbtn" data-act="openCard">🃏 내 카드 보기</button></div>` : '');
 }
+/* 내 카드: 한 번 누르면 열리고, 다시 누르거나 10초 지나면 닫힘 (꾹 누르기는 태블릿에서 끊기는 일이 많아 바꿈) */
+const CARD_MS = 10000;
+function openCard() {
+  if (!S.role) return toast('역할을 받는 중이에요. 잠시만 기다려 주세요.');
+  S.cardOpen = true; S.cardSeen = true;
+  clearTimeout(S.cardTimer); S.cardTimer = setTimeout(closeCard, CARD_MS);
+  renderCard(); render();
+}
+function closeCard() { clearTimeout(S.cardTimer); if (!S.cardOpen) return; S.cardOpen = false; renderCard(); }
 function renderCard() {
   if (!S.role) { paint($('#card'), ''); return; }
   const s = st(); const R0 = Logic.ROLES[S.role];
   let extra = '';
   if (S.role === 'mafia') {
+    const dayPhases = ['mission', 'think', 'meeting', 'vote', 'dayResult', 'night'];
+    if (amAlive() && s.round && dayPhases.includes(s.phase)) {
+      const sec = S.sec ? S.sec[s.round] : null;
+      if (sec && sec.m) {
+        const ok = sec.ok && Object.keys(sec.ok).length;
+        extra += `<div class="box mission">🤫 오늘의 비밀 미션<div class="big">${esc(sec.m)}</div>
+          <div>${ok ? '✅ 사회자가 확인했어요 → 오늘 밤 공격권 있음' : '⬜ 아직 확인 안 됨 (사회자가 보면 공격권!)'}</div></div>`;
+      } else extra += `<div class="box mission">🤫 오늘의 비밀 미션을 받는 중이에요…</div>`;
+    }
     const mates = Object.entries(S.team || {}).filter(([id]) => id !== S.pid)
       .map(([id, n]) => `${esc(n)}${S.pub && S.pub.players && S.pub.players[id] && !S.pub.players[id].alive ? ' (탈락)' : ''}`);
     extra += `<div class="box">🕶️ 우리 팀: ${mates.length ? mates.join(', ') : '나 혼자'}</div>`;
-    const sec = S.sec && s.round ? S.sec[s.round] : null;
-    if (sec && sec.m && amAlive() && ['mission', 'think', 'meeting', 'vote', 'dayResult', 'night'].includes(s.phase)) {
-      const ok = sec.ok && Object.keys(sec.ok).length;
-      extra += `<div class="box">🤫 오늘의 비밀 미션<br><b style="font-size:1.4rem">${esc(sec.m)}</b>
-        <div style="margin-top:8px">${ok ? '✅ 확인 완료 → 오늘 밤 공격권 있음' : '⬜ 아직 확인 안 됨 (사회자가 보면 공격권!)'}</div></div>`;
-    }
   } else if (S.role === 'doctor') extra = `<div class="box">밤마다 한 명을 지킬 수 있어요. 나 자신도 괜찮아요.</div>`;
   else extra = `<div class="box">친구들의 행동을 잘 보고 마피아를 찾아요.</div>`;
   if (me() && !me().alive) extra += `<div class="box">지금은 탈락해서 관전 중이에요.</div>`;
-  paint($('#card'), `<div class="secret" id="secretCard"><div class="sc"><div class="sm">내 역할</div>
-    <div class="role">${R0.emoji} ${R0.name}</div>${extra}<div class="sm" style="margin-top:12px">손을 떼면 숨겨져요</div></div></div>`);
+  paint($('#card'), `<div class="secret ${S.cardOpen ? 'show' : ''}" id="secretCard" data-act="closeCard"><div class="sc"><div class="sm">내 역할</div>
+    <div class="role">${R0.emoji} ${R0.name}</div>${extra}
+    <button class="btn big" data-act="closeCard" style="margin-top:16px">다 봤어요 (가리기)</button>
+    <div class="sm" style="margin-top:8px">10초가 지나면 저절로 가려져요</div></div></div>`);
 }
 
 const guideLine = t => `<p class="muted center" style="margin-top:8px">${t}</p>`;
@@ -232,15 +244,17 @@ const VIEWS = {
   reveal() {
     if (!S.role) return `<div class="hero"><div class="ic">🃏</div><p>역할을 나누는 중…</p></div>`;
     if (me() && me().ready) return `<div class="card hero"><div class="ic">👍</div><h2>역할 확인 완료</h2><p>다른 친구들을 기다려요.</p>
-      <p class="muted">다시 보고 싶으면 아래 카드 버튼을 꾹 누르세요.</p></div>`;
-    return `<div class="card hero"><h2>내 역할 확인하기</h2><p>옆 친구가 보지 않게 화면을 가리고,<br>아래 상자를 <b>꾹 누르고 있으면</b> 역할이 보여요.</p>
-      <div class="reveal-zone" data-hold="secretCard">👆 여기를 꾹 누르기</div>
-      <button class="btn big" data-act="confirmRole">확인했어요</button></div>`;
+      <p class="muted">다시 보고 싶으면 아래 <b>🃏 내 카드 보기</b>를 누르세요.</p></div>`;
+    return `<div class="card hero"><h2>내 역할 확인하기</h2><p>옆 친구가 보지 않게 화면을 가리고,<br>아래 상자를 <b>한 번 누르면</b> 역할이 보여요.</p>
+      <button class="reveal-zone" data-act="openCard">👆 여기를 눌러 내 역할 보기</button>
+      <button class="btn big" data-act="confirmRole" ${S.cardSeen ? '' : 'disabled'}>${S.cardSeen ? '확인했어요' : '먼저 역할을 봐 주세요'}</button></div>`;
   },
   mission() {
     const s = st();
     return `<div class="card hero"><div class="ic">🤸</div><h2>공통 미션</h2><div class="mission-box">${esc(s.mission || '')}</div>
-      ${guideLine('모두 함께 미션을 해요. 친구들의 행동을 잘 살펴보세요! 👀')}</div>`;
+      ${guideLine('모두 함께 미션을 해요. 친구들의 행동을 잘 살펴보세요! 👀')}
+      <button class="btn soft big" data-act="openCard" style="margin-top:12px">🃏 내 카드 보기</button>
+      <p class="small muted" style="margin-top:6px">미션 전에 모두 한 번씩 눌러 내 카드를 확인해요.</p></div>`;
   },
   think() {
     return `<div class="card hero"><div class="ic">🤔</div><h2>개인 추리 시간</h2><p>미션하는 동안 본 행동을 떠올려요.</p><p>누가 이상한 행동을 했나요?</p>
@@ -367,6 +381,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act, id = b.dataset.id;
   if (a === 'closeModal') { if (e.target === b) closeModal(); return; }
+  if (a === 'openCard') { openCard(); return; }
+  if (a === 'closeCard') { closeCard(); return; }
   if (b.tagName === 'A') e.preventDefault();
   if (a === 'goCode') { const v = ($('#codeIn').value || '').trim().toUpperCase(); if (!v) return toast('참가 코드를 넣어 주세요.'); S.code = v; history.replaceState(null, '', '?r=' + v); render(); enterRoom(); }
   else if (a === 'changeCode') { for (const k of Object.keys(L_)) unlisten(k); ls.del('mafia.room'); location.href = location.pathname; }

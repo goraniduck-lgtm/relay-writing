@@ -199,17 +199,4 @@ function startTicker(getState) {
   }, 250);
 }
 
-/* 꾹 누르고 있는 동안만 보이는 카드 */
-function bindHold(root) {
-  root.querySelectorAll('[data-hold]').forEach(btn => {
-    if (btn._bound) return; btn._bound = true;
-    const target = document.getElementById(btn.dataset.hold);
-    const show = e => { e.preventDefault(); if (target) target.classList.add('show'); btn.classList.add('holding'); };
-    const hide = () => { if (target) target.classList.remove('show'); btn.classList.remove('holding'); };
-    btn.addEventListener('pointerdown', show);
-    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach(ev => btn.addEventListener(ev, hide));
-    btn.addEventListener('contextmenu', e => e.preventDefault());
-  });
-}
-
 window.addEventListener('unhandledrejection', e => { console.warn(e.reason); });

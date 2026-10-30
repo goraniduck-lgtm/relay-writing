@@ -70,5 +70,5 @@ const store = {
 };
 const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'ko', { numeric: true });
 const rosterOf = c => (c && c.roster ? (Array.isArray(c.roster) ? c.roster : Object.values(c.roster)) : [])
-  .filter(x => x && x.no != null).sort((a, b) => a.no - b.no);
+  .filter(x => x && x.no != null && Number(x.no) > 0).map(x => ({ ...x, no: Number(x.no) })).sort((a, b) => a.no - b.no);
 const isPerm = e => /permission/i.test(String(e && (e.code || e.message)));

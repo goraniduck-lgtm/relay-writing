@@ -44,3 +44,17 @@
   → `node mafia/tools/build-rules.js` 로 `database.rules.json`에 합쳐짐
 - 입찰 마감은 서버 시각으로 보안 규칙이 막고, 판정·코인 차감은 마감 뒤 교사 화면이 한 번만(트랜잭션) 실행함
   → 입찰하는 동안 교사 화면을 켜 두어야 결과가 나옴 (꺼졌다 다시 열면 이어서 판정)
+
+## 움직이는 그림 공방 — 스캐니메이션 (`scanimation/`)
+
+- 학생 태블릿: `https://goraniduck-lgtm.github.io/relay-writing/scanimation/` (그리기 → 미리 보기 → **4. 선생님께 보내기**: 반 → 번호 → 보내기)
+  - 반이 미리 골라진 주소: `.../scanimation/?c=반ID` (교사 화면에서 복사)
+- 교사 받은 함: `https://goraniduck-lgtm.github.io/relay-writing/scanimation/teacher.html` (교사 계정 로그인)
+  - 학생별 PDF 받기, 반 전체를 한 PDF로 모아 받기(합성+필름 / 합성만 / 필름만), 지우기
+- 보내는 파일: **A5 가로 PDF 두 쪽** — ① 합성 그림(일반 종이) ② 줄무늬 필름(OHP, 벡터). 그림 자리 150×100mm가 두 쪽에서 같은 위치
+  - PDF가 3MB를 넘으면(사진 등) 합성 그림을 고화질 JPEG로 넣어 크기를 줄임
+- 반·명단은 릴레이 원고지의 `classList`, `classes/{반}/roster`를 읽기만 함
+- 데이터: `scanimation/subs/{반}/{제출}`(정보·장면 미리보기), `scanimation/files/{제출}`(PDF base64 조각, 50만 자씩)
+  - 보안 규칙: `scanimation/tools/rules.js` → `node mafia/tools/build-rules.js`로 합침. 시험: `node scanimation/tools/test-rules.js`
+  - 학생은 새 제출 만들기·자기 조각 올리기·완료 표시만 가능, 읽기·지우기는 교사만
+- PDF 도구는 `scanimation/vendor/`에 같이 둠(jsPDF 2.5.2, pdf-lib 1.17.1) — 학교 기기에서 외부 CDN이 막혀도 동작

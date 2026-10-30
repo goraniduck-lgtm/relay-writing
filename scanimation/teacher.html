@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>작품 받은 함 | 움직이는 그림 공방</title>
+<style>
+:root{font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;color:#203044;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}
+header{background:#18354c;color:#fff;padding:18px max(18px,calc((100vw - 1180px)/2));display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:22px;margin:0;flex:1}header .sub{color:#d3e5f2;font-size:13px}
+.wrap{max-width:1180px;margin:auto;padding:18px}
+.panel{background:#fff;border:1px solid #dfe6ed;border-radius:16px;padding:18px;box-shadow:0 3px 18px #253d4f0a;margin-bottom:16px}
+.panel h2{font-size:18px;margin:0 0 10px}
+button,.btn{border:1px solid #cad5df;background:#fff;border-radius:10px;padding:9px 13px;font:inherit;font-size:14px;font-weight:650;color:#203044;cursor:pointer}
+button.primary{background:#17628b;border-color:#17628b;color:#fff}button.danger{color:#b42318;border-color:#f0c4bf}
+button.small{padding:6px 9px;font-size:13px}button:disabled{opacity:.45;cursor:default}
+header button{background:transparent;color:#fff;border-color:#ffffff55}
+input{font:inherit;padding:10px;border:1px solid #bac8d4;border-radius:9px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.muted{color:#5c6c79;font-size:13px;line-height:1.55}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{border-radius:99px}.chip.on{background:#17628b;border-color:#17628b;color:#fff}
+.stats{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:6px 0 12px}.stats b{font-size:20px;color:#17628b}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:12px}
+.card{border:1px solid #dfe6ed;border-radius:12px;padding:10px;background:#fff;display:flex;flex-direction:column;gap:6px}
+.card.none{background:#f7f9fb;color:#8a98a4}
+.card .thumb{aspect-ratio:3/2;border:1px solid #e3e8ed;border-radius:6px;background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:13px}
+.card .thumb img{width:100%;height:100%;object-fit:contain;display:block}
+.card .nm{font-weight:700;font-size:15px}.card .tt{font-size:13px;color:#17628b;min-height:1.2em}
+.card .meta{font-size:12px;color:#697985}
+.card .acts{display:flex;gap:6px;flex-wrap:wrap}
+.badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:99px;background:#eaf4fc;color:#17628b;font-weight:700}
+.badge.warn{background:#fff6e3;color:#9a6200}
+details.old{font-size:12px}details.old summary{cursor:pointer;color:#5c6c79}
+details.old .item{display:flex;gap:6px;align-items:center;justify-content:space-between;margin-top:5px}
+.notice{border-left:4px solid #d19125;background:#fff6e3;padding:12px;font-size:13px;line-height:1.6;border-radius:4px}
+.login{max-width:380px;margin:40px auto;text-align:center}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#18354c;color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;box-shadow:0 6px 24px #0003;z-index:9}
+code{background:#eef3f7;padding:2px 6px;border-radius:5px;font-size:12px;word-break:break-all}
+</style>
+</head>
+<body>
+<header><h1>📥 작품 받은 함 <span class="sub">움직이는 그림 공방 · A5 PDF</span></h1><span id="who"></span></header>
+<main class="wrap" id="main"><div class="panel muted">불러오는 중…</div></main>
+<div id="toast" class="toast" hidden></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="common.js?v=1"></script>
+<script src="teacher.js?v=1"></script>
+</body>
+</html>

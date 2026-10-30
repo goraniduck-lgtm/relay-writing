@@ -184,7 +184,8 @@ const rules = {
     },
     relay: { '.read': 'auth != null' },   // 예전 데이터 (읽기만 그대로)
     mafia,
-    auction: require('../../auction/tools/rules.js')   // 자리 경매
+    auction: require('../../auction/tools/rules.js'),   // 자리 경매
+    scanimation: require('../../scanimation/tools/rules.js')   // 움직이는 그림 공방
   }
 };
 

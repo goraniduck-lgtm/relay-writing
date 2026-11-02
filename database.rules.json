@@ -467,6 +467,74 @@
         ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))",
         ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))"
       }
+    },
+    "dobble": {
+      "rooms": {
+        ".read": "auth != null",
+        "$c": {
+          ".write": "(auth != null && ((!data.exists() && $c.matches(/^[0-9]{4}$/) && newData.child('seats/a').val() === auth.uid && !newData.child('seats/b').exists() && !newData.child('claims').exists()) || (data.exists() && !newData.exists() && (data.child('seats/a').val() === auth.uid || data.child('seats/b').val() === auth.uid || data.child('ts').val() < now - 43200000))))",
+          ".validate": "newData.hasChildren(['ts', 'seats', 'cfg'])",
+          "ts": {
+            ".validate": "newData.isNumber() && (data.exists() ? newData.val() === data.val() : newData.val() === now)"
+          },
+          "seats": {
+            "a": {
+              ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+            },
+            "b": {
+              ".write": "(auth != null && !data.exists() && newData.val() === auth.uid && root.child('dobble/rooms/' + $c + '/seats/a').exists())",
+              ".validate": "newData.isString()"
+            },
+            "$o": {
+              ".validate": false
+            }
+          },
+          "names": {
+            "$s": {
+              ".write": "(auth != null && root.child('dobble/rooms/' + $c + '/seats/' + $s).val() === auth.uid)",
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 8"
+            }
+          },
+          "on": {
+            "$s": {
+              ".write": "(auth != null && root.child('dobble/rooms/' + $c + '/seats/' + $s).val() === auth.uid)",
+              ".validate": "newData.val() === true"
+            }
+          },
+          "cfg": {
+            ".write": "(auth != null && (root.child('dobble/rooms/' + $c + '/seats/a').val() === auth.uid || root.child('dobble/rooms/' + $c + '/seats/b').val() === auth.uid) && newData.exists())",
+            ".validate": "newData.hasChildren(['set', 'n', 'seed', 'st'])",
+            "set": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "n": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 57"
+            },
+            "seed": {
+              ".validate": "newData.isNumber()"
+            },
+            "st": {
+              ".validate": "newData.val() === 'wait' || newData.val() === 'play'"
+            },
+            "go": {
+              ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+            },
+            "$o": {
+              ".validate": false
+            }
+          },
+          "claims": {
+            ".write": "(auth != null && (root.child('dobble/rooms/' + $c + '/seats/a').val() === auth.uid || root.child('dobble/rooms/' + $c + '/seats/b').val() === auth.uid) && !newData.exists())",
+            "$r": {
+              ".write": "(auth != null && !data.exists() && $r.matches(/^[0-9]{1,2}$/) && root.child('dobble/rooms/' + $c + '/seats/' + newData.val()).val() === auth.uid && root.child('dobble/rooms/' + $c + '/cfg/st').val() === 'play' && root.child('dobble/rooms/' + $c + '/cfg/go').val() <= now)",
+              ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+            }
+          },
+          "$o": {
+            ".validate": false
+          }
+        }
+      }
     }
   }
 }

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#FBF6EC">
+<title>딱! 같은 그림</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%23fff' stroke='%23E5484D' stroke-width='3'/%3E%3Ctext x='20' y='27' font-size='18' text-anchor='middle'%3E⚡%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<div id="app">
+
+  <!-- 처음 화면 -->
+  <section id="home" class="screen">
+    <div class="hero">
+      <div class="logo" aria-hidden="true"><span>🐸</span><span>⚡</span><span>🍉</span></div>
+      <h1>딱! 같은 그림</h1>
+      <p class="sub">두 카드에 똑같이 있는 그림을 먼저 찾아 날려 보내요</p>
+    </div>
+    <label class="nick">내 별명 <small>(안 써도 돼요)</small>
+      <input id="nick" maxlength="8" autocomplete="off" placeholder="번개손">
+    </label>
+    <div class="menu">
+      <button class="big b-a" data-go="make-duo"><b>방 만들기</b><small>친구와 태블릿 2대로 대결</small></button>
+      <button class="big b-b" data-go="join"><b>방 들어가기</b><small>친구가 만든 방 번호 넣기</small></button>
+      <button class="big b-c" data-go="make-solo"><b>혼자 연습</b><small>태블릿 1대로 기록 재기</small></button>
+    </div>
+    <p class="resume" id="resume" hidden></p>
+  </section>
+
+  <!-- 세트·길이 고르기 -->
+  <section id="make" class="screen" hidden>
+    <header class="top"><button class="back" data-go="home" aria-label="처음으로">←</button><h2 id="makeTitle">방 만들기</h2></header>
+    <h3>그림 세트</h3>
+    <div class="sets" id="sets"></div>
+    <h3>판 길이</h3>
+    <div class="chips" id="lengths"></div>
+    <button class="primary" id="makeGo">방 만들기</button>
+  </section>
+
+  <!-- 방 번호 넣기 -->
+  <section id="join" class="screen" hidden>
+    <header class="top"><button class="back" data-go="home" aria-label="처음으로">←</button><h2>방 들어가기</h2></header>
+    <p class="hint">친구 화면에 보이는 방 번호 네 자리</p>
+    <div class="code-in" id="codeIn"><span></span><span></span><span></span><span></span></div>
+    <div class="pad" id="pad"></div>
+  </section>
+
+  <!-- 기다리는 방 -->
+  <section id="lobby" class="screen" hidden>
+    <header class="top"><button class="back" id="leave" aria-label="나가기">←</button><h2>대결 방</h2></header>
+    <p class="hint">친구 태블릿에서 <b>방 들어가기</b> → 이 번호</p>
+    <div class="code-big" id="codeBig"></div>
+    <p class="set-line" id="lobbySet"></p>
+    <div class="players" id="players"></div>
+    <button class="primary" id="startBtn" disabled>시작!</button>
+  </section>
+
+  <!-- 게임 -->
+  <section id="play" class="screen" hidden>
+    <header class="bar opp" id="oppBar">
+      <span class="who"><i class="dot" id="oppDot"></i><b id="oppName"></b><em id="oppOff" hidden>연결 끊김</em></span>
+      <span class="count"><b id="oppScore">0</b>장</span>
+      <div class="mini card" id="oppMini"></div>
+    </header>
+    <main class="table" id="table">
+      <div class="slot">
+        <div class="card center" id="cC"></div>
+        <p class="lbl" id="leftLbl">가운데 카드</p>
+      </div>
+      <div class="slot mine">
+        <div class="pile" id="pile"></div>
+        <div class="card me" id="cM"></div>
+        <p class="lbl" id="info">내 카드</p>
+      </div>
+    </main>
+    <footer class="bar me-bar">
+      <span class="who"><i class="dot" id="myDot"></i><b id="myName"></b></span>
+      <span class="count"><b id="myScore">0</b>장</span>
+      <span class="combo" id="combo"></span>
+    </footer>
+    <div class="count-over" id="countOver" hidden><b id="countNum"></b></div>
+  </section>
+
+  <!-- 결과 -->
+  <div class="result" id="result" hidden>
+    <div class="rbox">
+      <p class="rtitle" id="rTitle"></p>
+      <div class="rscore" id="rScore"></div>
+      <p class="rsub" id="rSub"></p>
+      <div class="rbtns">
+        <button class="primary" id="again">다시 하기</button>
+        <button class="ghost" id="toHome">처음으로</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="fly" aria-hidden="true"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<script src="sets.js?v=1"></script>
+<script src="feel.js?v=1"></script>
+<script src="deck.js?v=1"></script>
+<script src="common.js?v=1"></script>
+<script src="fx.js?v=1"></script>
+<script src="game.js?v=1"></script>
+</body>
+</html>

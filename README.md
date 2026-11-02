@@ -73,3 +73,13 @@
 - 데이터: 같은 Firebase 프로젝트의 `gusuk/` 아래 (cfg, secret, adm, dev, cards, trash). 보안 규칙: `gusuk/tools/rules.js`
   → `node mafia/tools/build-rules.js`로 합침. 시험: `node gusuk/tools/test-rules.js`
 - 브라우저 시험용 가짜 DB: `gusuk/tools/fake-db.js` (Playwright addInitScript, `?uid=` 로 기기 구분)
+
+## 딱! 같은 그림 — 도블식 2인 대결 (`dobble/`)
+
+- 태블릿: `https://goraniduck-lgtm.github.io/relay-writing/dobble/` (방 만들기 → 네 자리 번호 / 방 들어가기 / 혼자 연습)
+- 규칙: 내 카드와 가운데 카드에 똑같이 있는 그림을 눌렀다 떼면 날아가 부딪힘. 먼저 맞힌 쪽이 가운데 카드를 가져감(내 카드가 됨). 카드를 많이 모은 쪽이 이김
+- **그림 세트(과목별)**: `dobble/sets.js` — 그림 7·13·31·57개 → 카드 한 장에 3·4·6·8개. 이모지·낱말·그림 파일 가능
+- **손맛 조절**: `dobble/feel.js` — 재질(무거움·가벼움·말랑함·단단함), 콤보 불, 틀렸을 때 잠김 시간, 기기 성능
+- 판정: `dobble/rooms/{번호}/claims/{판}` 에 먼저 쓴 자리만 받음(트랜잭션 + 보안 규칙). 점수·카드는 이 기록만으로 두 태블릿이 똑같이 계산
+- 보안 규칙: `dobble/tools/rules.js` → `node mafia/tools/build-rules.js` 로 합침
+- 시험: `node dobble/tools/test-deck.js`(카드 규칙) · `node dobble/tools/test-rules.js`(보안 규칙) · `node dobble/tools/test-play.js`(정적 서버를 띄운 뒤, 두 태블릿 동시 대결)

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>교사 · 구석구석 다 함께 찾아요</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%23174F56'/%3E%3Cpath d='M20 7l5 13-5 13-5-13z' fill='%23fff'/%3E%3Cpath d='M20 7l5 13h-10z' fill='%23F2C12E'/%3E%3C/svg%3E">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="style.css?v=1">
+<style>
+a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
+.wrap{max-width:1280px;margin:0 auto;padding:14px 16px 60px}
+.ttabs{display:flex;gap:6px;flex-wrap:wrap}
+.ttabs .tab{border-radius:10px;border-bottom:1.5px solid var(--line)}
+.ttabs .tab.on{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:none}
+.panel{background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;display:grid;gap:12px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filters select,.filters input{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
+.sumchips{display:flex;gap:8px;flex-wrap:wrap}
+.sumchips .chip b{margin-left:4px}
+.trow{display:grid;grid-template-columns:200px minmax(0,1fr) 200px;gap:14px;align-items:start;background:#fff;border:1.5px solid var(--line);border-left:6px solid var(--gc);border-radius:12px;padding:11px 13px}
+.trow .who{display:grid;gap:3px;font-size:14px;justify-items:start}
+.trow .who b{font-size:15px}
+.trow .what{display:grid;gap:4px;font-size:14.5px}
+.trow .what .nm{font-size:17px;font-weight:800}
+.trow .what .meta{font-size:13px;color:var(--soft)}
+.trow .acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.trow .memo{font-size:13px;color:var(--err);font-weight:700}
+.badge-off{font-size:11.5px;font-weight:800;color:var(--ok);background:#E3F4E8;border-radius:6px;padding:0 6px}
+.badge-un{font-size:11.5px;font-weight:800;color:#8a5a00;background:#FFF1D6;border-radius:6px;padding:0 6px}
+.badge-fx{font-size:11.5px;font-weight:800;color:#1D4ED8;background:#E3EDFD;border-radius:6px;padding:0 6px}
+.list{display:grid;gap:8px}
+/* 통계 */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpi{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi .v{font-size:38px;font-weight:900;letter-spacing:-.03em;line-height:1.1}
+.kpi .v small{font-size:18px;color:var(--soft)}
+.kpi .l{font-size:14px;color:var(--soft);font-weight:700}
+.sgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
+.viz{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:10px;align-content:start}
+.viz h3{font-size:16px}
+.viz .sub{font-size:13px;color:var(--soft);margin-top:-6px}
+.hbar{display:grid;grid-template-columns:70px 1fr 40px;gap:8px;align-items:center;font-size:14px;font-weight:700}
+.hbar .track{height:22px;display:flex;border-radius:6px;overflow:hidden;background:#F1ECE1}
+.hbar .track i{display:block;height:100%}
+.hbar .n{text-align:right;font-variant-numeric:tabular-nums}
+.catk{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.catk>div{border-radius:12px;padding:10px;text-align:center;background:color-mix(in srgb,var(--cc) 9%,#fff);border:1.5px solid color-mix(in srgb,var(--cc) 30%,#fff)}
+.catk .i{font-size:26px}
+.catk b{display:block;font-size:28px;color:var(--cc);line-height:1.1}
+.catk span{font-size:13px;font-weight:700}
+.smap{height:430px}
+.keyrow{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--soft);font-weight:700}
+.keyrow i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+.set{display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:12px 0;border-bottom:1.5px dashed var(--line)}
+.set:last-child{border-bottom:none}
+.set .k{font-weight:800}
+.qrbox{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.qrbox svg{width:130px;height:130px;background:#fff;border-radius:8px}
+.login{max-width:440px;margin:8vh auto;background:var(--card);border:1.5px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:24px;display:grid;gap:14px}
+.login h2{text-align:center}
+.login input{border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;width:100%}
+.rsearch{position:relative}
+.rsearch .rres{position:absolute;z-index:5;left:0;right:0;top:100%;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-height:240px;overflow:auto}
+.rsearch .rres button{display:block;width:100%;text-align:left;border:none;background:none;padding:8px 12px}
+.rsearch .rres button:hover{background:#FFF7E6}
+@media(max-width:900px){.trow{grid-template-columns:1fr}.trow .acts{justify-content:flex-start}.sgrid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.set{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">불러오는 중…</div></div>
+<script src="vendor/qrcode.js"></script>
+<script src="mapdata.js?v=1"></script>
+<script src="common.js?v=1"></script>
+<script src="map.js?v=1"></script>
+<script src="teacher.js?v=1"></script>
+</body>
+</html>

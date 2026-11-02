@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TV · 구석구석 다 함께 찾아요</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%231F6F78'/%3E%3Cpath d='M20 7l5 13-5 13-5-13z' fill='%23fff'/%3E%3Cpath d='M20 7l5 13h-10z' fill='%23F2C12E'/%3E%3C/svg%3E">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="style.css?v=1">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;font-size:18px}
+#app{flex:1;min-height:0;display:flex;flex-direction:column}
+.top h1{font-size:28px}
+.top .goal{font-size:16px;padding:7px 14px}.top .goal-bar{width:180px;height:12px}
+.qr{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--soft)}
+.qr svg{width:64px;height:64px;background:#fff;border-radius:6px}
+.tvmain{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 460px;grid-template-rows:minmax(0,1fr);gap:14px;padding:14px}
+.tvmain .mapbox{height:100%;min-height:0}
+.col{display:flex;flex-direction:column;gap:10px;min-height:0}
+.gsel{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.gsel button{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 0;font-weight:900;font-size:17px;display:grid;justify-items:center;line-height:1.15}
+.gsel button small{font-size:12px;font-weight:700;color:var(--soft)}
+.gsel button.on{background:var(--gc,var(--accent));border-color:var(--gc,var(--accent));color:#fff}
+.gsel button.on small{color:#fff}
+.gsel button.g3.on{color:#3a2c00}.gsel button.g3.on small{color:#3a2c00}
+.feed{flex:1;min-height:0;overflow:auto;background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:10px;align-content:start}
+.feed h2{font-size:22px}
+.feed .mcard .nm{font-size:21px}
+.feed .mcard .w{font-size:17px}
+.feed .mcard .rg{font-size:14px;font-weight:800;color:var(--soft)}
+.feed .mcard.new{animation:pop .9s ease}
+@keyframes pop{0%{transform:scale(.9);background:#FFF3C4}100%{transform:none}}
+.bigsheet .mcard .nm{font-size:24px}.bigsheet .mcard .w{font-size:19px}.bigsheet .mcard .meta{font-size:15px}
+.bigsheet h2{font-size:26px!important}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">불러오는 중…</div></div>
+<script src="vendor/qrcode.js"></script>
+<script src="mapdata.js?v=1"></script>
+<script src="common.js?v=1"></script>
+<script src="map.js?v=1"></script>
+<script src="tv.js?v=1"></script>
+</body>
+</html>

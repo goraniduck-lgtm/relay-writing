@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>인쇄 · 구석구석 다 함께 찾아요</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="style.css?v=1">
+<style id="pagestyle"></style>
+<style>
+body{background:#8E8A82;background-image:none}
+.bar{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1.5px solid var(--line);padding:10px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.bar h1{font-size:18px;margin-right:6px}
+.bar .grp{display:flex;gap:6px;align-items:center}
+.bar .grp>span{font-size:13px;font-weight:800;color:var(--soft)}
+.bar .note{flex-basis:100%;font-size:13px;color:var(--soft)}
+.pages{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;padding:22px}
+.page{background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.35);position:relative;overflow:hidden;flex:none}
+.page svg{position:absolute;display:block}
+.hiddefs{position:absolute;width:0;height:0;overflow:hidden}
+.poster text{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif}
+@media print{
+  body{background:#fff}
+  .bar{display:none}
+  .pages{display:block;padding:0}
+  .page{box-shadow:none;transform:none!important;margin:0!important;break-after:page;page-break-after:always}
+  .page:last-child{break-after:auto;page-break-after:auto}
+  *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>🖨️ 출력물 만들기</h1>
+  <div class="grp"><span>크기</span><button class="chip" data-mode="a4x4">A4 4장 (이어 붙여 A2)</button><button class="chip" data-mode="a2">A2 1장</button><button class="chip" data-mode="a4">A4 1장 (축소)</button></div>
+  <div class="grp"><span>넣을 카드</span><button class="chip" data-inc="all">모든 카드</button><button class="chip" data-inc="ok">확인 완료만</button></div>
+  <button class="btn primary" id="print">인쇄 / PDF로 저장</button>
+  <div class="note" id="note"></div>
+</div>
+<div id="defs"></div>
+<div class="pages" id="pages"><div class="loading" style="color:#fff">불러오는 중…</div></div>
+<script src="mapdata.js?v=1"></script>
+<script src="common.js?v=1"></script>
+<script src="map.js?v=1"></script>
+<script src="print.js?v=1"></script>
+</body>
+</html>

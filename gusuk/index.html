@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>구석구석 다 함께 찾아요</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%231F6F78'/%3E%3Cpath d='M20 7l5 13-5 13-5-13z' fill='%23fff'/%3E%3Cpath d='M20 7l5 13h-10z' fill='%23F2C12E'/%3E%3C/svg%3E">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="style.css?v=1">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column}
+#app{flex:1;min-height:0;display:flex;flex-direction:column}
+.smain{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:12px;padding:12px}
+.mapcol{display:flex;flex-direction:column;gap:8px;min-height:0}
+.mapcol .mapbox{flex:1}
+.finder{display:grid;gap:8px;position:relative}
+.searchrow{display:flex;gap:8px}
+.searchrow input{flex:1;border:1.5px solid var(--line);border-radius:12px;padding:10px 14px;font-size:16px;background:#fff}
+.results{position:absolute;top:48px;left:0;right:0;z-index:20;background:#fff;border:1.5px solid var(--line);border-radius:12px;box-shadow:var(--shadow);max-height:46vh;overflow:auto}
+.results button{display:flex;width:100%;text-align:left;border:none;background:none;padding:11px 14px;gap:8px;align-items:center;border-bottom:1px solid #f0ebe0}
+.results button:hover,.results button:focus{background:#FFF7E6}
+.results small{color:var(--soft)}
+.sidorow{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;scrollbar-width:thin}
+.sidorow .chip{padding:6px 11px;font-size:14px}
+.sidorow .chip .f{display:inline-block;width:7px;height:7px;border-radius:50%;background:#2F9E5B;margin-left:4px;vertical-align:middle}
+.side{background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:auto;display:flex;flex-direction:column;min-height:0}
+.side .sec{padding:14px 16px;border-bottom:1.5px dashed var(--line);display:grid;gap:10px}
+.side .sec:last-child{border-bottom:none}
+.side h2{font-size:21px}
+.side h3{font-size:15px;color:var(--soft)}
+.rhead{display:flex;align-items:flex-start;gap:8px}
+.rhead .t{flex:1}
+.rhead small{display:block;color:var(--soft);font-size:13px}
+.links{display:grid;gap:7px}
+.lnk{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;text-decoration:none;color:var(--ink);font-weight:700}
+.lnk .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:17px;flex:none}
+.lnk small{display:block;font-weight:500;color:var(--soft);font-size:12px}
+.lnk.gs .ic{background:#E0F0F4}
+.lnk.web .ic{background:#EAF5E3}
+.qlinks{display:flex;flex-wrap:wrap;gap:6px}
+.qlinks a{font-size:13px;font-weight:700;text-decoration:none;color:var(--cc);border:1.5px solid color-mix(in srgb,var(--cc) 35%,#fff);border-radius:99px;padding:4px 10px;background:#fff}
+.reglist{display:flex;flex-wrap:wrap;gap:6px}
+.reglist .chip{display:inline-flex;align-items:center;gap:5px}
+.reglist .chip i{width:11px;height:11px;border-radius:3px;background:var(--gc,#ddd);border:1px solid rgba(0,0,0,.15)}
+.cards{display:grid;gap:8px}
+.steps{margin:0;padding-left:20px;display:grid;gap:4px;font-size:15px}
+.fixalert{background:#FDE8E8;border:1.5px solid #F3B4B4;border-radius:12px;padding:10px 12px;display:grid;gap:6px;color:var(--err);font-weight:700}
+.startwrap{flex:1;display:grid;place-items:center;padding:20px;overflow:auto}
+.startbox{background:var(--card);border:1.5px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:28px;max-width:720px;width:100%;display:grid;gap:18px;text-align:center}
+.startbox h2{font-size:30px;letter-spacing:-.03em}
+.ggrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.gbtn{border:none;border-radius:18px;padding:22px 8px;font-size:26px;font-weight:900;color:#fff;background:var(--gc);box-shadow:0 4px 0 rgba(0,0,0,.18);position:relative;overflow:hidden}
+.gbtn.g3{color:#3a2c00}
+.gbtn svg{position:absolute;inset:0;width:100%;height:100%;opacity:.9;pointer-events:none}
+.gbtn span{position:relative}
+.gbtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+@media (max-width:900px),(orientation:portrait){
+  html,body{overflow:auto;height:auto}
+  .smain{grid-template-columns:1fr;flex:none}
+  .mapcol .mapbox{height:58vh;flex:none}
+  .side{overflow:visible}
+  .goal-t{display:none}
+}
+@media (max-width:560px){.ggrid{grid-template-columns:repeat(2,1fr)}.catbtns{grid-template-columns:repeat(2,1fr)!important}.brand small{display:none}}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">불러오는 중…</div></div>
+<script src="mapdata.js?v=1"></script>
+<script src="common.js?v=1"></script>
+<script src="map.js?v=1"></script>
+<script src="student.js?v=1"></script>
+</body>
+</html>

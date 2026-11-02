@@ -350,6 +350,123 @@
           }
         }
       }
+    },
+    "gusuk": {
+      "cfg": {
+        ".read": "auth != null",
+        ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))",
+        "home": {
+          ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 6"
+        },
+        "paint": {
+          ".validate": "(newData.val() === 'all' || newData.val() === 'ok')"
+        },
+        "lock": {
+          ".validate": "newData.isBoolean()"
+        },
+        "hasPin": {
+          ".validate": "newData.isBoolean()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
+      "secret": {
+        ".read": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+        ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))",
+        "pin": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]{8}$/)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
+      "adm": {
+        "$u": {
+          ".read": "auth != null && auth.uid === $u",
+          ".write": "auth != null && auth.uid === $u && (!newData.exists() || newData.val() === root.child('gusuk/secret/pin').val())"
+        }
+      },
+      "ping": {
+        "$u": {
+          ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val())) && auth.uid === $u"
+        }
+      },
+      "dev": {
+        ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))",
+        ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))",
+        "$u": {
+          ".read": "auth != null && auth.uid === $u",
+          ".write": "auth != null && auth.uid === $u && !data.exists()",
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 6"
+        }
+      },
+      "cards": {
+        ".read": "auth != null",
+        ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))",
+        "$id": {
+          ".write": "auth != null && newData.exists() && root.child('gusuk/cfg/lock').val() !== true && newData.child('g').val() === root.child('gusuk/dev/' + auth.uid).val() && (!data.exists() && newData.child('st').val() === 'rv' && newData.child('ts').val() === now && newData.child('u').val() === auth.uid && !newData.child('memo').exists() && !newData.child('tch').exists() && !newData.child('fx').exists() && !newData.child('up').exists() || data.exists() && data.child('g').val() === root.child('gusuk/dev/' + auth.uid).val() && data.child('st').val() !== 'ok' && newData.child('st').val() === 'rv' && newData.child('ts').val() === data.child('ts').val() && newData.child('memo').val() === data.child('memo').val() && newData.child('tch').val() === data.child('tch').val() && newData.child('u').val() === data.child('u').val() && newData.child('up').val() === now)",
+          ".validate": "newData.hasChildren(['g','r','c','n','w','m','src','st','ts'])",
+          "g": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 6"
+          },
+          "r": {
+            ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 6"
+          },
+          "c": {
+            ".validate": "(newData.val() === 'fest' || newData.val() === 'prod' || newData.val() === 'pride' || newData.val() === 'sym')"
+          },
+          "n": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+          },
+          "w": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80"
+          },
+          "m": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "h": {
+            ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 40"
+          },
+          "t": {
+            ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 30"
+          },
+          "src": {
+            ".validate": "(newData.val() === 'gs' || newData.val() === 'web' || newData.val() === 'book' || newData.val() === 'etc')"
+          },
+          "url": {
+            ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().matches(/^https?:\\/\\//)"
+          },
+          "st": {
+            ".validate": "(newData.val() === 'rv' || newData.val() === 'fix' || newData.val() === 'ok')"
+          },
+          "memo": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "ts": {
+            ".validate": "newData.isNumber()"
+          },
+          "up": {
+            ".validate": "newData.isNumber()"
+          },
+          "u": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+          },
+          "fx": {
+            ".validate": "newData.isBoolean()"
+          },
+          "tch": {
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "trash": {
+        ".read": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))",
+        ".write": "((auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2') || (auth != null && root.child('gusuk/secret/pin').exists() && root.child('gusuk/adm/' + auth.uid).val() === root.child('gusuk/secret/pin').val()))"
+      }
     }
   }
 }

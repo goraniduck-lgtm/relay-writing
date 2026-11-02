@@ -5,6 +5,8 @@
        seats/a, b    자리 → 기기(uid). a 는 만든 사람, b 는 처음 들어온 한 명만
        names/a, b    별명 (그 자리 기기만)
        on/a, b       접속 중 표시 (그 자리 기기만)
+       quit/a, b     게임 중에 나감 (그 자리 기기만) — 상대 화면에 '친구가 나갔어요'
+       (2번 자리는 기다리는 동안에만 스스로 비울 수 있음)
        cfg           {set, n, seed, st:'wait'|'play', go} — 두 자리 기기 모두 바꿀 수 있음 (시작·다시 하기)
        claims/{판}   그 판을 가진 자리 'a'|'b' — 비어 있을 때 자기 자리로만, 시작 시각이 지난 뒤에만
    방 지우기: 그 방의 두 자리 기기, 또는 12시간 지난 방은 누구나 (정리용) */
@@ -27,13 +29,21 @@ module.exports = {
       ts: { '.validate': 'newData.isNumber() && (data.exists() ? newData.val() === data.val() : newData.val() === now)' },
       seats: {
         a: { '.validate': 'newData.isString() && (!data.exists() || newData.val() === data.val())' },
-        b: { '.write': and('auth != null', '!data.exists()', 'newData.val() === auth.uid', `${roomAt('seats/a')}.exists()`), '.validate': 'newData.isString()' },
+        b: {
+          '.write': and('auth != null', or(
+            and('!data.exists()', 'newData.val() === auth.uid', `${roomAt('seats/a')}.exists()`),
+            and('data.val() === auth.uid', '!newData.exists()', `${roomAt('cfg/st')}.val() === 'wait'`))),
+          '.validate': 'newData.isString()'
+        },
         $o: { '.validate': false }
       },
       names: {
         $s: { '.write': and('auth != null', ownSeat), '.validate': 'newData.isString() && newData.val().length >= 1 && newData.val().length <= 8' }
       },
       on: {
+        $s: { '.write': and('auth != null', ownSeat), '.validate': 'newData.val() === true' }
+      },
+      quit: {
         $s: { '.write': and('auth != null', ownSeat), '.validate': 'newData.val() === true' }
       },
       cfg: {

@@ -18,12 +18,16 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const server = {};
   await ctx.exposeFunction('__serverClaim', (p, v) => { if (server[p]) return false; server[p] = v; return true; });
   await ctx.addInitScript(fake);
+  await ctx.addInitScript(() => { try { if (localStorage.getItem('dobble.fs') == null) localStorage.setItem('dobble.fs', 'false'); } catch (e) {} });
   await ctx.route(/fonts\.googleapis|fonts\.gstatic|gstatic\.com\/firebasejs/, r => r.abort());
   const errors = [];
   const open = async (uid) => {
     const p = await ctx.newPage();
     p.on('pageerror', e => errors.push(uid + ': ' + e.message));
+    p.on('dialog', d => { if (d.type() === 'beforeunload') { p._askedLeave = true; d.accept().catch(() => {}); } else { errors.push(uid + ': dialog ' + d.type()); d.dismiss().catch(() => {}); } });
     p.on('console', m => { if (m.type() === 'error' && !/ERR_FAILED|Failed to load/.test(m.text())) errors.push(uid + ': ' + m.text()); });
+    const click = p.click.bind(p);
+    p.click = async (sel, o) => { await p.bringToFront(); return click(sel, o); };
     await p.goto(`${BASE}?uid=${uid}&lag=${LAG}`);
     return p;
   };
@@ -41,11 +45,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok('방 번호 네 자리', /^\d{4}$/.test(code), code);
   await B.fill('#nick', '토끼');
   await B.click('[data-go="join"]');
-  for (const d of '0000'.slice(0, 0) + code) await B.click(`#pad [data-k="${d}"]`);
+  const typeCode = async (p, c) => { for (const d of c) { await p.click(`#pad [data-k="${d}"]`); await sleep(200); } };
+  await typeCode(B, code);
   await B.waitForSelector('#lobby:not([hidden])');
   await A.waitForFunction(() => !document.querySelector('#startBtn').disabled);
-  ok('A 화면에 B 이름', (await A.textContent('#players')).includes('토끼'));
+  ok('A 화면에 B 이름', await A.waitForFunction(() => document.querySelector('#players').textContent.includes('토끼'), null, { timeout: 5000 }).then(() => true, () => false));
   await shot(A, '2-lobby');
+
+  /* 기다리는 방에서 B가 나갔다가 다시 들어오기 */
+  await B.click('#leave');
+  await B.waitForSelector('#home:not([hidden])');
+  await A.waitForFunction(() => document.querySelector('#startBtn').disabled, null, { timeout: 5000 });
+  ok('B가 나가면 A 화면에 빈자리', (await A.textContent('#players')).includes('기다리는'));
+  await B.click('[data-go="join"]');
+  await typeCode(B, code);
+  await B.waitForSelector('#lobby:not([hidden])');
+  await A.waitForFunction(() => !document.querySelector('#startBtn').disabled, null, { timeout: 5000 });
+  ok('B 다시 들어옴', true);
 
   /* 시작 */
   await B.click('#startBtn');
@@ -55,10 +71,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await Promise.all([A, B].map(p => p.waitForFunction(() => G.playing, null, { timeout: 8000 })));
 
   const state = p => p.evaluate(() => ({ shown: G.shown, scores: G.scores, claims: G.claims.join(''), ended: G.ended, busy: G.busy, pending: !!G.pending, locked: G.locked, combo: G.combo, playing: G.playing }));
+  const idle = p => p.waitForFunction(() => G.playing && !G.busy && !G.pending && !G.locked && performance.now() >= G.readyAt, null, { timeout: 8000 });
   /* 내 카드에서 맞는(또는 틀린) 그림을 눌렀다 뗌 */
   const press = async (p, right, holdMs) => {
     const pos = await p.evaluate(right => {
-      if (!G.playing || G.busy || G.pending || G.locked) return null;
+      if (!G.playing || G.busy || G.pending || G.locked || performance.now() < G.readyAt) return null;
       const c = centerCard(); const mine = G.tops[G.seat];
       const sid = right ? mine.find(s => c.includes(s)) : mine.find(s => !c.includes(s));
       const el = document.querySelector(`#cM .sy[data-s="${sid}"]`);
@@ -71,6 +88,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   };
 
   /* 틀린 그림 → 잠김 */
+  await idle(A);
   await press(A, false);
   ok('틀리면 잠김', await A.waitForFunction(() => G.locked, null, { timeout: 3000 }).then(() => true, () => false));
   await shot(A, '4-wrong');
@@ -116,7 +134,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const ra = await state(A);
   ok('다시 하기: 점수 0부터', ra.scores.a === 0 && ra.scores.b === 0 && ra.claims === '');
   ok('다시 하기: 같은 가운데 카드', JSON.stringify(await A.evaluate(() => centerCard())) === JSON.stringify(await B.evaluate(() => centerCard())));
-  const idle = p => p.waitForFunction(() => G.playing && !G.busy && !G.pending && !G.locked, null, { timeout: 8000 });
   for (let i = 0; i < 3; i++) { await idle(A); await press(A, true, 40); await sleep(200); }
   await idle(A);
   const ca = await state(A);
@@ -127,14 +144,90 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const cb = await state(B);
   ok('B 화면에서도 A 3장', cb.scores.a === 3);
 
+  /* 연속 터치 막기 */
+  await idle(A);
+  await press(A, true, 40);
+  const guard1 = await A.evaluate(() => new Promise(res => {
+    const t0 = performance.now();
+    (function tick() {
+      if (!G.busy && !G.pending) {
+        const inGuard = performance.now() < G.readyAt;
+        const c = centerCard(), sid = G.tops[G.seat].find(s => c.includes(s));
+        const el = document.querySelector(`#cM .sy[data-s="${sid}"]`), r = el.getBoundingClientRect();
+        el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, isPrimary: true, pointerId: 7, clientX: r.left + 5, clientY: r.top + 5 }));
+        const took = !!G.pressed;
+        if (took) cancelPress();
+        return res({ inGuard, took });
+      }
+      if (performance.now() - t0 > 5000) return res({ timeout: true });
+      requestAnimationFrame(tick);
+    })();
+  }));
+  ok('새 카드 직후 바로 누르면 무시', guard1.inGuard && !guard1.took, JSON.stringify(guard1));
+  await idle(A);
+  const multi = await A.evaluate(() => {
+    const c = centerCard(), sid = G.tops[G.seat].find(s => c.includes(s));
+    const el = document.querySelector(`#cM .sy[data-s="${sid}"]`);
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, isPrimary: false, pointerId: 9 }));
+    const took = !!G.pressed; if (took) cancelPress(); return took;
+  });
+  ok('두 번째 손가락은 무시', multi === false);
+  const before = (await state(A)).shown;
+  const pos = await A.evaluate(() => { const c = centerCard(), sid = G.tops[G.seat].find(s => c.includes(s)); const r = document.querySelector(`#cM .sy[data-s="${sid}"]`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  for (let i = 0; i < 4; i++) { await A.mouse.click(pos.x, pos.y, { delay: 15 }); }
+  await idle(A);
+  ok('네 번 연타해도 한 판만', (await state(A)).shown === before + 1, JSON.stringify(await state(A)));
+
+  /* 뒤로 가기(스와이프) */
+  await A.evaluate(() => history.back());
+  await A.waitForSelector('#ask:not([hidden])', { timeout: 3000 });
+  ok('뒤로 가기 → 나갈까요? 물어봄', !(await A.isHidden('#play')));
+  await shot(A, '7b-ask-quit');
+  await A.click('#askBtns .primary');
+  ok('계속하기 → 게임 그대로', await A.isHidden('#ask') && (await A.evaluate(() => G.playing)));
+
   /* 나갔다가 다시 들어오기 (새로고침) */
+  const aNow = (await state(A)).scores.a;
   await B.reload();
   await B.click('#resume button');
-  await B.waitForFunction(() => G.playing && G.scores.a === 3, null, { timeout: 8000 });
+  await B.waitForFunction(n => G.playing && G.scores.a === n, aNow, { timeout: 8000 });
   ok('새로고침 후 이어서 하기', true);
+  ok('게임 중 새로고침하면 브라우저가 한 번 물어봄', B._askedLeave === true);
+
+  /* 게임 중 나가기 */
+  await A.click('#quitBtn');
+  await A.waitForSelector('#ask:not([hidden])');
+  await A.click('#askBtns .ghost');
+  await A.waitForSelector('#home:not([hidden])');
+  ok('A 나가기 → 처음 화면', true);
+  await B.waitForSelector('#ask:not([hidden])', { timeout: 5000 });
+  ok('B 화면: 친구가 나갔어요', /나갔어요/.test(await B.textContent('#askTitle')));
+  ok('B 게임 멈춤', !(await B.evaluate(() => G.playing)));
+  await shot(B, '7c-opp-left');
+  await B.click('#askBtns .primary');
+  await B.waitForSelector('#home:not([hidden])');
+  await sleep(400);
+  ok('둘 다 나가면 방 지워짐', await A.evaluate(c => !(JSON.parse(localStorage.getItem('__fakedb_dobble__') || '{}').dobble || { rooms: {} }).rooms?.[c], code));
+  ok('이어서 하기 안 보임', await A.isHidden('#resume') && await B.isHidden('#resume'));
 
   /* 혼자 연습 */
   const S = await open('tabS');
+  /* 그림 파일 세트 (시험용 그림 13개) */
+  await S.evaluate(() => {
+    const cs = ['#E5484D', '#F2994A', '#F2C94C', '#27AE60', '#2D9CDB', '#9B51E0', '#EB5757', '#6FCF97', '#56CCF2', '#BB6BD9', '#219653', '#F2994A', '#333'];
+    const svg = (c, i) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><circle cx="256" cy="256" r="240" fill="${c}"/><text x="256" y="330" font-size="220" text-anchor="middle" fill="#fff" font-family="sans-serif">${i + 1}</text></svg>`);
+    SETS.push({ id: 'img-test', name: '그림 파일 시험', show: 'both', symbols: cs.map((c, i) => ({ img: svg(c, i), w: '그림' + (i + 1) })) });
+  });
+  await S.click('[data-go="make-solo"]');
+  await S.click('[data-set="img-test"]');
+  await S.click('#makeGo');
+  await S.waitForFunction(() => G.playing, null, { timeout: 8000 });
+  ok('그림 파일이 카드에 보임', await S.evaluate(() => [...document.querySelectorAll('#cM .sy img')].length === 4 && [...document.querySelectorAll('#cM .sy img')].every(i => i.complete && i.naturalWidth > 0)));
+  await shot(S, '8a-image-set');
+  await idle(S); await press(S, true, 40); await idle(S);
+  ok('그림 파일 세트로 한 판', (await S.evaluate(() => G.shown)) === 1);
+  await S.click('#quitBtn'); await S.click('#askBtns .ghost');
+  await S.waitForSelector('#home:not([hidden])');
   await S.click('[data-go="make-solo"]');
   await S.click('[data-set="sci-ecosystem"]');
   await S.click('#makeGo');
@@ -147,6 +240,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await shot(S, '9-solo-result');
 
   /* 세로 화면 */
+  await A.click('[data-go="make-solo"]'); await A.click('[data-set="basic"]'); await A.click('#makeGo');
+  await A.waitForFunction(() => G.playing, null, { timeout: 8000 });
   await A.setViewportSize({ width: 800, height: 1280 });
   await sleep(300);
   const geo = await A.evaluate(() => { const a = cC.getBoundingClientRect(), b = cM.getBoundingClientRect(); return { a: [a.top, a.bottom, a.width], b: [b.top, b.bottom], h: innerHeight }; });

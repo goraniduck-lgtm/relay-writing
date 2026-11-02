@@ -11,13 +11,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 <div id="app">
 
   <!-- 처음 화면 -->
   <section id="home" class="screen">
+    <button class="fs-btn corner" data-fs aria-label="전체화면"><svg class="fs-ic" viewBox="0 0 24 24" aria-hidden="true"><path class="fs-go" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="fs-back" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg><span class="fs-t">전체화면</span></button>
     <div class="hero">
       <div class="logo" aria-hidden="true"><span>🐸</span><span>⚡</span><span>🍉</span></div>
       <h1>딱! 같은 그림</h1>
@@ -84,6 +85,10 @@
       <span class="who"><i class="dot" id="myDot"></i><b id="myName"></b></span>
       <span class="count"><b id="myScore">0</b>장</span>
       <span class="combo" id="combo"></span>
+      <span class="tools">
+        <button class="fs-btn" data-fs aria-label="전체화면"><svg class="fs-ic" viewBox="0 0 24 24" aria-hidden="true"><path class="fs-go" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="fs-back" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg></button>
+        <button class="quit-btn" id="quitBtn">나가기</button>
+      </span>
     </footer>
     <div class="count-over" id="countOver" hidden><b id="countNum"></b></div>
   </section>
@@ -100,16 +105,25 @@
       </div>
     </div>
   </div>
+
+  <!-- 물어보기 (나가기 확인 · 친구가 나감) -->
+  <div class="result ask" id="ask" hidden>
+    <div class="rbox">
+      <p class="rtitle" id="askTitle"></p>
+      <p class="rsub" id="askSub"></p>
+      <div class="rbtns" id="askBtns"></div>
+    </div>
+  </div>
 </div>
 
 <div id="fly" aria-hidden="true"></div>
 <canvas id="fx" aria-hidden="true"></canvas>
 
-<script src="sets.js?v=1"></script>
-<script src="feel.js?v=1"></script>
-<script src="deck.js?v=1"></script>
-<script src="common.js?v=1"></script>
-<script src="fx.js?v=1"></script>
-<script src="game.js?v=1"></script>
+<script src="sets.js?v=2"></script>
+<script src="feel.js?v=2"></script>
+<script src="deck.js?v=2"></script>
+<script src="common.js?v=2"></script>
+<script src="fx.js?v=2"></script>
+<script src="game.js?v=2"></script>
 </body>
 </html>

@@ -7,14 +7,82 @@ const G = {
   mode: null, seat: null, opp: null, code: null, room: null, cfg: null, key: null, gen: 0,
   set: null, game: null, start: 2, claims: [], shown: 0, tops: {}, scores: {},
   combo: 0, best: 0, busy: false, locked: false, playing: false, ended: false,
-  pressed: null, jit: null, pending: null, syncing: false, roundStart: 0, unsub: null, clock: null, t0: 0
+  pressed: null, pressId: null, jit: null, pending: null, syncing: false, roundStart: 0, unsub: null, clock: null, t0: 0,
+  readyAt: 0, oppGone: false, joining: false
 };
 const make = { mode: 'duo', set: ls.get('dobble.set', SETS[0].id), len: ls.get('dobble.len', 25) };
 const roomPath = () => `${ROOT}/rooms/${G.code}`;
 const cC = $('#cC'), cM = $('#cM'), table = $('#table');
 
 /* ================= 메뉴 ================= */
-function show(id) { document.querySelectorAll('.screen').forEach(s => { s.hidden = s.id !== id; }); window.scrollTo(0, 0); }
+let screenEpoch = 0;
+function show(id) { screenEpoch++; document.querySelectorAll('.screen').forEach(s => { s.hidden = s.id !== id; }); window.scrollTo(0, 0); trapBack(id !== 'home'); }
+const screenNow = () => { const s = [...document.querySelectorAll('.screen')].find(x => !x.hidden); return s ? s.id : 'home'; };
+const inGame = () => ['lobby', 'play'].includes(screenNow());
+
+/* ---------- 뒤로 가기(가장자리 스와이프) 막기 ----------
+   화면에 머무는 동안 기록을 하나 더 쌓아 두고, 뒤로 가기가 오면 다시 쌓은 뒤 '나갈까요?'를 물음 */
+let trapped = false, skipPop = 0;
+function trapBack(on) {
+  if (on && !trapped) { history.pushState({ dobble: 1 }, ''); trapped = true; }
+  else if (!on && trapped) { trapped = false; skipPop++; history.back(); }
+}
+addEventListener('popstate', () => {
+  if (skipPop) { skipPop--; return; }
+  trapped = false;
+  const id = screenNow();
+  if (id === 'make' || id === 'join') { show('home'); renderResume(); return; }
+  if (id === 'home') return;
+  trapBack(true);
+  if (!$('#result').hidden && !G.oppGone) return;
+  if ($('#ask').hidden) askQuit();
+});
+addEventListener('beforeunload', e => { if (inGame() && !G.oppGone) { e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+
+/* ---------- 전체화면 ---------- */
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function fsEnter() {
+  const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen;
+  if (!f || fsEl()) return;
+  try { const p = f.call(d, { navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+function fsExit() { const f = document.exitFullscreen || document.webkitExitFullscreen; if (f && fsEl()) { try { const p = f.call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {} } }
+const fsWanted = () => GAME.autoFullscreen && ls.get('dobble.fs', true) !== false;
+const fsAuto = () => { if (fsWanted()) fsEnter(); };
+function fsSync() { document.body.classList.toggle('is-fs', !!fsEl()); document.querySelectorAll('[data-fs]').forEach(b => b.setAttribute('aria-label', fsEl() ? '전체화면 끄기' : '전체화면')); }
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, () => { fsSync(); if (!$('#play').hidden) setTimeout(fit, 60); }));
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-fs]')) return;
+  if (fsEl()) { ls.set('dobble.fs', false); fsExit(); } else { ls.set('dobble.fs', true); fsEnter(); }
+});
+
+/* ---------- 버튼 두 번 눌림 막기 ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const gap = b.closest('#pad') ? 150 : GAME.buttonGuardMs, now = performance.now();
+  if (b._ep === screenEpoch && now - b._last < gap) { e.stopImmediatePropagation(); e.preventDefault(); return; }
+  b._last = now; b._ep = screenEpoch;
+}, true);
+
+/* ---------- 물어보기 창 ---------- */
+function ask(title, sub, btns) {
+  $('#askTitle').textContent = title; $('#askSub').textContent = sub || ''; $('#askSub').hidden = !sub;
+  const box = $('#askBtns'); box.innerHTML = '';
+  btns.forEach(b => { const el = document.createElement('button'); el.className = b.main ? 'primary' : 'ghost'; el.textContent = b.label; el.onclick = () => { $('#ask').hidden = true; b.fn && b.fn(); }; box.appendChild(el); });
+  $('#ask').hidden = false;
+  cancelPress();
+}
+function askQuit() {
+  const duo = G.mode === 'duo' && G.room && G.room.seats && G.room.seats.b;
+  ask('게임을 그만할까요?', duo ? '친구 화면에는 "친구가 나갔어요"가 떠요' : '', [
+    { label: '계속하기', main: true },
+    { label: '나가기', fn: quitGame }
+  ]);
+}
+$('#quitBtn').addEventListener('click', askQuit);
 const nickOf = () => ($('#nick').value || '').trim().slice(0, 8);
 $('#nick').value = ls.get('dobble.nick', '');
 $('#nick').addEventListener('input', () => ls.set('dobble.nick', nickOf()));
@@ -23,6 +91,7 @@ document.addEventListener('pointerdown', () => FX.audio(), { once: true });
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-go]'); if (!b) return;
   const go = b.dataset.go;
+  if (go !== 'home') fsAuto();
   if (go === 'home') { show('home'); renderResume(); }
   else if (go === 'join') { codeBuf = ''; renderCode(); show('join'); }
   else { make.mode = go === 'make-solo' ? 'solo' : 'duo'; renderMake(); show('make'); }
@@ -33,8 +102,8 @@ function renderMake() {
   $('#makeGo').textContent = make.mode === 'solo' ? '시작!' : '방 만들기';
   if (!SETS.some(s => s.id === make.set)) make.set = SETS[0].id;
   $('#sets').innerHTML = SETS.map(s => {
-    const pv = s.symbols.slice(0, 8).map(x => x.e || x.w).join(s.show === 'word' ? ' · ' : '');
-    return `<button class="set${s.id === make.set ? ' on' : ''}" data-set="${esc(s.id)}"><b>${esc(s.name)}</b><span class="pv">${esc(pv)}</span><small>${esc(s.desc || '')}</small></button>`;
+    const pv = s.symbols.slice(0, 8).map(x => x.img ? `<img src="${esc(x.img)}" alt="">` : esc(s.show === 'word' ? x.w : (x.e || x.w))).join(s.show === 'word' ? ' · ' : '');
+    return `<button class="set${s.id === make.set ? ' on' : ''}" data-set="${esc(s.id)}"><b>${esc(s.name)}</b><span class="pv">${pv}</span><small>${esc(s.desc || '')}</small></button>`;
   }).join('');
   const total = symbolsFor(orderFor(setById(make.set).symbols.length));
   $('#lengths').innerHTML = GAME.lengths.map(l => {
@@ -44,7 +113,8 @@ function renderMake() {
 }
 $('#sets').addEventListener('click', e => { const b = e.target.closest('[data-set]'); if (!b) return; make.set = b.dataset.set; ls.set('dobble.set', make.set); renderMake(); });
 $('#lengths').addEventListener('click', e => { const b = e.target.closest('[data-len]'); if (!b) return; make.len = +b.dataset.len; ls.set('dobble.len', make.len); renderMake(); });
-$('#makeGo').addEventListener('click', () => { if (make.mode === 'solo') startSolo(); else createRoom(); });
+$('#makeGo').addEventListener('click', () => { fsAuto(); if (make.mode === 'solo') startSolo(); else createRoom(); });
+$('#sets').addEventListener('click', () => preloadSet(setById(make.set)));
 const newSeed = () => 1 + Math.floor(Math.random() * 2147483000);
 
 /* ---------- 방 번호 입력 ---------- */
@@ -56,7 +126,7 @@ $('#pad').addEventListener('click', e => {
   const k = b.dataset.k;
   if (k === 'c') codeBuf = ''; else if (k === 'b') codeBuf = codeBuf.slice(0, -1); else if (codeBuf.length < 4) codeBuf += k;
   renderCode();
-  if (codeBuf.length === 4) tryJoin(codeBuf);
+  if (codeBuf.length === 4) { fsAuto(); tryJoin(codeBuf); }
 });
 function codeError(msg) {
   const el = $('#codeIn'); el.classList.remove('err'); void el.offsetWidth; el.classList.add('err');
@@ -91,6 +161,8 @@ async function cleanOld() {
   } catch (e) {}
 }
 async function tryJoin(code) {
+  if (G.joining) return;
+  G.joining = true;
   try {
     const uid = (await DB.ready()).uid;
     const room = await DB.get(`${ROOT}/rooms/${code}`);
@@ -102,34 +174,55 @@ async function tryJoin(code) {
     if (nickOf()) await DB.set(`${ROOT}/rooms/${code}/names/b`, nickOf());
     enterRoom(code, 'b');
   } catch (e) { console.warn(e); codeError('들어가지 못했어요. 다시 해 주세요.'); }
+  finally { G.joining = false; }
 }
 function enterRoom(code, seat) {
-  leaveRoom(true);
-  Object.assign(G, { mode: 'duo', code, seat, opp: seat === 'a' ? 'b' : 'a', room: null, key: null });
+  leaveRoom();
+  Object.assign(G, { mode: 'duo', code, seat, opp: seat === 'a' ? 'b' : 'a', room: null, key: null, oppGone: false });
   ls.set('dobble.last', { code, seat });
   DB.whileOnline(`${roomPath()}/on/${seat}`, true).catch(() => {});
+  DB.remove(`${roomPath()}/quit/${seat}`).catch(() => {});
   $('#codeBig').innerHTML = code.split('').map(d => `<span>${d}</span>`).join('');
   show('lobby');
-  G.unsub = DB.on(roomPath(), onRoom);
+  const tok = ++roomTok;
+  G.unsub = DB.on(roomPath(), r => { if (tok === roomTok) onRoom(r); });
 }
-function leaveRoom(quiet) {
+let roomTok = 0;
+function leaveRoom() {
+  roomTok++;
   if (G.unsub) { G.unsub(); G.unsub = null; }
-  if (G.mode === 'duo' && G.code && !quiet) {
-    const alone = G.seat === 'a' && G.room && !(G.room.seats || {}).b;
-    (alone ? DB.remove(roomPath()) : DB.remove(`${roomPath()}/on/${G.seat}`)).catch(() => {});
-    ls.set('dobble.last', null);
-  }
   stopGame();
-  G.code = null; G.room = null; G.mode = null;
+  G.code = null; G.room = null; G.mode = null; G.oppGone = false;
+}
+/* 나가기: 기다리는 방이면 자리를 비우고, 게임 중이면 '나갔음'을 남김. 둘 다 나가면 방을 지움 */
+function quitGame() {
+  if (G.mode === 'duo' && G.code) {
+    const r = G.room || {}, base = roomPath(), seat = G.seat;
+    const oppHere = r.seats && r.seats[G.opp] && !(r.quit && r.quit[G.opp]);
+    let job;
+    if (!oppHere || G.oppGone) job = DB.remove(base);
+    else if (r.cfg && r.cfg.st === 'wait') job = seat === 'a' ? DB.remove(base) : DB.update(base, { 'names/b': null, 'seats/b': null, 'on/b': null });
+    else job = DB.update(base, { [`quit/${seat}`]: true, [`on/${seat}`]: null });
+    job.catch(e => console.warn(e));
+  }
+  ls.set('dobble.last', null);
+  leaveRoom(); show('home'); renderResume();
 }
 const seatName = s => (G.room && G.room.names && G.room.names[s]) || GAME.names[s];
 
 function onRoom(room) {
   if (!room || !room.cfg) {
-    if (G.room) toast('방이 닫혔어요');
-    leaveRoom(true); ls.set('dobble.last', null); show('home'); renderResume(); return;
+    if (G.room && !G.oppGone) toast('방이 닫혔어요');
+    leaveRoom(); ls.set('dobble.last', null); show('home'); renderResume(); return;
   }
   G.room = room; G.cfg = room.cfg;
+  if (room.quit && room.quit[G.opp]) {
+    if (!G.oppGone) {
+      G.oppGone = true; stopGame(); ls.set('dobble.last', null);
+      ask(`${seatName(G.opp)} 친구가 나갔어요`, '새 방을 만들어 다시 할 수 있어요', [{ label: '처음으로', main: true, fn: quitGame }]);
+    }
+    return;
+  }
   if (room.cfg.st === 'wait') { renderLobby(room); if ($('#lobby').hidden) show('lobby'); return; }
   const key = room.cfg.seed + '/' + room.cfg.go;
   if (key !== G.key) { G.key = key; setupGame(room.cfg, normClaims(room.claims)); }
@@ -151,14 +244,15 @@ function renderLobby(room) {
   $('#startBtn').disabled = !(room.seats && room.seats.b);
 }
 $('#startBtn').addEventListener('click', () => {
+  fsAuto();
   DB.update(`${roomPath()}/cfg`, { st: 'play', go: Math.round(DB.now() + (GAME.countdown + .6) * 1000) }).catch(() => toast('시작하지 못했어요'));
 });
-$('#leave').addEventListener('click', () => { leaveRoom(); show('home'); renderResume(); });
+$('#leave').addEventListener('click', quitGame);
 
 function renderResume() {
   const last = ls.get('dobble.last', null), el = $('#resume');
   el.hidden = !last;
-  if (last) { el.innerHTML = `<button>방 ${esc(last.code)} 이어서 하기</button>`; el.firstChild.onclick = () => tryJoin(last.code); }
+  if (last) { el.innerHTML = `<button>방 ${esc(last.code)} 이어서 하기</button>`; el.firstChild.onclick = () => { fsAuto(); tryJoin(last.code); }; }
 }
 renderResume();
 
@@ -172,19 +266,28 @@ const centerCard = () => G.game.deck[G.start + G.shown];
 const remaining = () => G.game.deck.length - G.start - G.shown;
 
 function startSolo() {
-  leaveRoom(true);
+  leaveRoom();
   Object.assign(G, { mode: 'solo', seat: 'a', opp: null, room: null, code: null });
   setupGame({ set: make.set, n: make.len, seed: newSeed(), go: Date.now() + (GAME.countdown + .6) * 1000 }, []);
 }
 function stopGame() {
   G.gen++; G.playing = false; G.busy = false; G.pending = null; G.locked = false;
   cancelPress(); clearInterval(G.clock); FX.clearAll(); $('#fly').innerHTML = '';
-  $('#result').hidden = true; $('#countOver').hidden = true;
+  $('#result').hidden = true; $('#countOver').hidden = true; $('#ask').hidden = true;
+}
+/* 그림 파일은 미리 불러 두기 (카드가 바뀔 때 늦게 뜨지 않게) */
+const preloaded = {};
+function preloadSet(set) {
+  return Promise.all(set.symbols.filter(x => x.img).map(x => {
+    if (!preloaded[x.img]) { const im = new Image(); im.src = x.img; preloaded[x.img] = (im.decode ? im.decode() : Promise.resolve()).catch(() => {}); }
+    return preloaded[x.img];
+  }));
 }
 function setupGame(cfg, claims) {
   stopGame();
   const gen = G.gen;
   G.cfg = cfg; G.set = setById(cfg.set);
+  preloadSet(G.set);
   G.game = makeGame(G.set, cfg.seed, cfg.n || 0);
   G.start = G.mode === 'solo' ? 1 : 2;
   G.claims = []; G.shown = 0; G.combo = 0; G.best = 0; G.ended = false;
@@ -237,7 +340,10 @@ addEventListener('resize', () => { if (!$('#play').hidden) fit(); });
 
 function symHtml(i) {
   const s = G.set.symbols[i], mode = G.set.show;
-  if (s.img) return { cls: '', html: `<img src="${esc(s.img)}" alt="${esc(s.w || '')}" draggable="false">` };
+  if (s.img) {
+    const img = `<img src="${esc(s.img)}" alt="${esc(s.w || '')}" draggable="false">`;
+    return mode === 'both' && s.w ? { cls: 'both', html: img + `<span class="w">${esc(s.w)}</span>` } : { cls: '', html: img };
+  }
   if (!s.e || mode === 'word') { const len = Math.max(1, [...(s.w || '')].length); return { cls: 'word', html: `<span class="w" style="--wf:${clamp(.95 / len, .2, .48).toFixed(3)}">${esc(s.w)}</span>` }; }
   if (mode === 'both' && s.w) return { cls: 'both', html: `<span class="e">${esc(s.e)}</span><span class="w">${esc(s.w)}</span>` };
   return { cls: '', html: `<span class="e">${esc(s.e)}</span>` };
@@ -252,6 +358,7 @@ function renderCard(el, card) {
 function renderCenter(anim) {
   if (G.start + G.shown >= G.game.deck.length) { cC.innerHTML = ''; cC.style.visibility = 'hidden'; }
   else { cC.style.visibility = ''; renderCard(cC, centerCard()); }
+  if (anim) G.readyAt = Math.max(G.readyAt, performance.now() + GAME.newCardGuardMs);
   if (anim) cC.animate([{ transform: 'scale(.5) rotate(-20deg)', opacity: 0 }, { transform: 'scale(1.08) rotate(3deg)', opacity: 1, offset: .7 }, { transform: 'scale(1) rotate(0)' }], { duration: 320, easing: 'ease-out' });
   $('#leftLbl').textContent = `가운데 카드 · 남은 ${Math.max(0, remaining())}장`;
 }
@@ -327,8 +434,9 @@ const center = el => { const r = el.getBoundingClientRect(); return [r.left + r.
 cM.addEventListener('pointerdown', e => {
   const s = e.target.closest('.sy');
   if (!s || !G.playing || G.ended || G.busy || G.locked || G.pending || G.pressed) return;
+  if (!e.isPrimary || performance.now() < G.readyAt || !$('#ask').hidden) return;
   e.preventDefault();
-  G.pressed = s;
+  G.pressed = s; G.pressId = e.pointerId;
   const sid = +s.dataset.s, m = matOf(G.set, sid);
   $('#info').textContent = `${symName(G.set, sid)} · ${m.name}`;
   FX.tone(m.press[0] * J(), .07, m.press[1], m.press[1] === 'square' ? .07 : .22, m.press[0] * .35);
@@ -354,8 +462,8 @@ function cancelPress() {
   const s = G.pressed; G.pressed = null; relax();
   s.classList.remove('hold'); s.style.transition = ''; setv(s, { sx: 1, sy: 1 });
 }
-addEventListener('pointerup', () => { if (!G.pressed) return; const s = G.pressed; G.pressed = null; relax(); launch(s); });
-addEventListener('pointercancel', cancelPress);
+addEventListener('pointerup', e => { if (!G.pressed || e.pointerId !== G.pressId) return; const s = G.pressed; G.pressed = null; relax(); launch(s); });
+addEventListener('pointercancel', e => { if (e.pointerId === G.pressId) cancelPress(); });
 
 /* ================= 날리기 ================= */
 function flightFrames(dx, dy, r0, r1, m, arc) {
@@ -405,7 +513,7 @@ async function launch(s) {
   flying = false;
   if (gen !== G.gen) { fl.remove(); return; }
 
-  if (!ok) { await bounce(fl, s, dx, dy, m); G.busy = false; return; }
+  if (!ok) { await bounce(fl, s, dx, dy, m); G.busy = false; G.readyAt = Math.max(G.readyAt, performance.now() + GAME.tapGapMs); return; }
 
   /* 판정이 아직이면 부딪힌 자세로 잠깐 멈춤 (히트스톱) */
   const result = P.result || await Promise.race([P.decided, wait(1500).then(() => 'net')]);
@@ -414,6 +522,7 @@ async function launch(s) {
   else await missRace(fl, s, result);
   if (gen !== G.gen) return;
   G.pending = null; G.busy = false;
+  G.readyAt = Math.max(G.readyAt, performance.now() + GAME.tapGapMs);
   sync(); checkEnd();
 }
 
@@ -521,10 +630,11 @@ function finish() {
   }, 600);
 }
 $('#again').addEventListener('click', () => {
+  fsAuto();
   if (G.mode === 'solo') { make.set = G.cfg.set; make.len = G.cfg.n; startSolo(); return; }
   if (G.cfg && G.cfg.go > DB.now()) return;
   DB.remove(`${roomPath()}/claims`)
     .then(() => DB.update(`${roomPath()}/cfg`, { seed: newSeed(), st: 'play', go: Math.round(DB.now() + (GAME.countdown + .6) * 1000) }))
     .catch(() => toast('다시 시작하지 못했어요'));
 });
-$('#toHome').addEventListener('click', () => { leaveRoom(); show('home'); renderResume(); });
+$('#toHome').addEventListener('click', quitGame);

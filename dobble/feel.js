@@ -24,6 +24,10 @@ const GAME = {
   flightMax: 320,
   fastSec: .8,           // 새 카드가 나온 뒤 이 시간 안에 찾으면 가장 세게 + '빠르다!'
   wrongLockMs: 1000,     // 틀리면 내 카드가 잠기는 시간
+  tapGapMs: 300,         // 한 번 날린 뒤 다음 누르기까지 최소 시간 (연속 터치 막기)
+  newCardGuardMs: 250,   // 새 가운데 카드가 나온 직후 누르기를 받지 않는 시간 (앞 카드를 보고 누른 손가락 막기)
+  buttonGuardMs: 600,    // 같은 버튼을 두 번 빨리 눌러도 한 번만
+  autoFullscreen: true,  // 방 만들기·들어가기·시작할 때 전체화면으로
   countdown: 3,          // 시작 전 3, 2, 1
   lengths: [             // 방 만들 때 고르는 판 길이 (카드 장수, 0 = 세트 전체)
     { n: 15, name: '짧게' },

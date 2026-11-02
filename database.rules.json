@@ -482,7 +482,7 @@
               ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
             },
             "b": {
-              ".write": "(auth != null && !data.exists() && newData.val() === auth.uid && root.child('dobble/rooms/' + $c + '/seats/a').exists())",
+              ".write": "(auth != null && ((!data.exists() && newData.val() === auth.uid && root.child('dobble/rooms/' + $c + '/seats/a').exists()) || (data.val() === auth.uid && !newData.exists() && root.child('dobble/rooms/' + $c + '/cfg/st').val() === 'wait')))",
               ".validate": "newData.isString()"
             },
             "$o": {
@@ -496,6 +496,12 @@
             }
           },
           "on": {
+            "$s": {
+              ".write": "(auth != null && root.child('dobble/rooms/' + $c + '/seats/' + $s).val() === auth.uid)",
+              ".validate": "newData.val() === true"
+            }
+          },
+          "quit": {
             "$s": {
               ".write": "(auth != null && root.child('dobble/rooms/' + $c + '/seats/' + $s).val() === auth.uid)",
               ".validate": "newData.val() === true"

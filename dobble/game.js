@@ -102,7 +102,7 @@ function renderMake() {
   $('#makeGo').textContent = make.mode === 'solo' ? '시작!' : '방 만들기';
   if (!SETS.some(s => s.id === make.set)) make.set = SETS[0].id;
   $('#sets').innerHTML = SETS.map(s => {
-    const pv = s.symbols.slice(0, 8).map(x => x.img ? `<img src="${esc(x.img)}" alt="">` : esc(s.show === 'word' ? x.w : (x.e || x.w))).join(s.show === 'word' ? ' · ' : '');
+    const pv = s.symbols.slice(0, 8).map(x => x.img ? `<img src="${esc(x.img)}" alt="">` : esc(s.show === 'word' ? x.w : (emojiOf(x) || x.w))).join(s.show === 'word' ? ' · ' : '');
     return `<button class="set${s.id === make.set ? ' on' : ''}" data-set="${esc(s.id)}"><b>${esc(s.name)}</b><span class="pv">${pv}</span><small>${esc(s.desc || '')}</small></button>`;
   }).join('');
   const total = symbolsFor(orderFor(setById(make.set).symbols.length));
@@ -339,14 +339,14 @@ function fit() {
 addEventListener('resize', () => { if (!$('#play').hidden) fit(); });
 
 function symHtml(i) {
-  const s = G.set.symbols[i], mode = G.set.show;
+  const s = G.set.symbols[i], mode = G.set.show, e = emojiOf(s);
   if (s.img) {
     const img = `<img src="${esc(s.img)}" alt="${esc(s.w || '')}" draggable="false">`;
     return mode === 'both' && s.w ? { cls: 'both', html: img + `<span class="w">${esc(s.w)}</span>` } : { cls: '', html: img };
   }
-  if (!s.e || mode === 'word') { const len = Math.max(1, [...(s.w || '')].length); return { cls: 'word', html: `<span class="w" style="--wf:${clamp(.95 / len, .2, .48).toFixed(3)}">${esc(s.w)}</span>` }; }
-  if (mode === 'both' && s.w) return { cls: 'both', html: `<span class="e">${esc(s.e)}</span><span class="w">${esc(s.w)}</span>` };
-  return { cls: '', html: `<span class="e">${esc(s.e)}</span>` };
+  if (!e || mode === 'word') { const len = Math.max(1, [...(s.w || '')].length); return { cls: 'word', html: `<span class="w" style="--wf:${clamp(.95 / len, .2, .48).toFixed(3)}">${esc(s.w)}</span>` }; }
+  if (mode === 'both' && s.w) return { cls: 'both', html: `<span class="e">${esc(e)}</span><span class="w">${esc(s.w)}</span>` };
+  return { cls: '', html: `<span class="e">${esc(e)}</span>` };
 }
 function renderCard(el, card) {
   if (!card) { el.innerHTML = ''; return; }

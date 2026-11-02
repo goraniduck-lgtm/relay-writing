@@ -69,6 +69,27 @@ function toast(msg) {
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 2600);
 }
 
+/* 이 기기가 그릴 수 있는 이모지인지 (못 그리면 네모 칸 대신 낱말만 보이게) */
+const emojiOk = (function () {
+  const cache = {}; let cx = null, ref = null;
+  const draw = t => { cx.clearRect(0, 0, 32, 32); cx.fillText(t, 0, 26); return cx.getImageData(0, 0, 32, 32).data; };
+  return e => {
+    if (e in cache) return cache[e];
+    try {
+      if (!cx) {
+        const cv = document.createElement('canvas'); cv.width = cv.height = 32;
+        cx = cv.getContext('2d', { willReadFrequently: true });
+        cx.font = '26px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif';
+        ref = draw('\u{10FFFD}');
+      }
+      const d = draw(e); let same = true, any = false;
+      for (let i = 0; i < d.length; i++) { if (d[i] !== ref[i]) same = false; if ((i & 3) === 3 && d[i]) any = true; }
+      return (cache[e] = any && !same);
+    } catch (err) { return (cache[e] = true); }
+  };
+})();
+const emojiOf = s => (s.e && emojiOk(s.e) ? s.e : '');
+
 /* 그림 정보 */
 const setById = id => SETS.find(s => s.id === id) || SETS[0];
 function matOf(set, i) {

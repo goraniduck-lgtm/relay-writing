@@ -121,7 +121,7 @@ h3{font-size:20px;margin:18px 0 10px;color:var(--soft)}
 .sy .w{font-family:var(--jua);font-size:calc(var(--d) * var(--sz) * var(--wf));white-space:nowrap;color:var(--ink)}
 .sy.both{grid-template-rows:auto auto;align-content:center;gap:0}
 .sy.both .e{font-size:calc(var(--d) * var(--sz) * .56)}
-.sy.both .w{font-size:calc(var(--d) * var(--sz) * .2);margin-top:2%}
+.sy.both .w{font-size:max(14px,calc(var(--d) * var(--sz) * .22));margin-top:2%}
 .sy img{width:88%;height:88%;object-fit:contain;pointer-events:none;-webkit-user-drag:none}
 .sy.both img{width:74%;height:74%}
 .sy.hold{--halo:rgba(47,111,237,.18)}

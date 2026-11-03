@@ -59,7 +59,9 @@ for (const set of SETS) for (const x of set.symbols) if (x.img) {
   if (set.id === 'soc-region') ok(`${x.w} 출처`, x.src && x.src.org && x.src.char && x.src.page && [1, 2, 3, 4].includes(x.src.kogl) && x.note);
 }
 const region = SETS.find(s => s.id === 'soc-region');
-ok('지역 세트 49개 → 카드 6개씩', region && region.symbols.length === 49 && D.makeGame(region, 5, 0).per === 6);
+ok('지역 세트 57개 → 카드 8개씩', region && region.symbols.length === 57 && D.makeGame(region, 5, 0).per === 8);
+ok('지역 세트: 그림 49 + 낱말 8', region.symbols.filter(x => x.img).length === 49 && region.symbols.filter(x => !x.img && x.w && x.note && x.visit).length === 8);
+ok('지역 세트: 낱말이 겹치지 않음', new Set(region.symbols.map(x => x.w)).size === 57);
 /* 씨앗이 다르면 다른 판 */
 const s0 = SETS[0];
 ok('씨앗이 다르면 순서가 다름', JSON.stringify(D.makeGame(s0, 1, 0).deck) !== JSON.stringify(D.makeGame(s0, 2, 0).deck));

@@ -74,7 +74,7 @@ section > h3{color:var(--ink);font-size:24px;margin:0 0 10px}
 </div>
 
 <script src="sets.js?v=4"></script>
-<script src="sets-region.js?v=1"></script>
+<script src="sets-region.js?v=2"></script>
 <script>
 'use strict';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -96,7 +96,9 @@ credited.forEach((set, si) => {
   sec.innerHTML = `<h3>${esc(set.name)}</h3>
     <div class="filter"><input type="search" placeholder="지역이나 캐릭터 이름" aria-label="지역이나 캐릭터 이름으로 찾기">
       <button class="chip on" data-cat="">전체</button>${cats.map(c => `<button class="chip" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-    <p class="count"></p><div class="grid"></div>`;
+    <p class="count"></p><div class="grid"></div>
+    ${set.symbols.some(x => !x.src && x.visit) ? `<h3 style="font-size:20px;margin:18px 0 8px">그림 없이 낱말로 나오는 지역 자랑거리</h3>
+    <div class="links">${set.symbols.filter(x => !x.src && x.visit).map(x => `<a class="lk" href="${esc('https://korean.visitkorea.or.kr/search/search_list.do?keyword=' + encodeURIComponent(x.visit))}" target="_blank" rel="noopener"><span class="ic">🔎</span><span><b>${esc(x.w)}</b><small>${esc(x.note)} · 구석구석에서 찾아보기</small></span></a>`).join('')}</div>` : ''}`;
   box.appendChild(sec);
   const grid = sec.querySelector('.grid'), input = sec.querySelector('input'), count = sec.querySelector('.count');
   let cat = '';

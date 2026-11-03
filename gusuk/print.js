@@ -2,6 +2,7 @@
    포스터는 mm 단위 SVG(420×594) 하나로 그리고, 쪽마다 <use>로 필요한 부분만 보여 줌 */
 'use strict';
 const P = { cfg: {}, cards: {}, mode: ls.get('gusuk.pmode', 'a4x4'), inc: ls.get('gusuk.pinc', 'all') };
+{ const m = new URLSearchParams(location.search).get('m'); if (['a4x4', 'a4x8', 'a2', 'a4'].includes(m)) P.mode = m; }   // 교사 화면의 A2·A1 버튼
 const PW = 420, PH = 594;              // A2 (mm)
 const M = 7, OV = 8;                   // A4 인쇄 여백, 겹쳐 붙이는 폭 (mm)
 const TW = 210 - 2 * M, TH = 297 - 2 * M;

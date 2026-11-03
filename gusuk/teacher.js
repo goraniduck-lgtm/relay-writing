@@ -62,7 +62,8 @@ function enter() {
   app.innerHTML = `<header class="top"><div class="brand">${LOGO_T}<div><h1>구석구석 다 함께 찾아요</h1><small>교사 화면</small></div></div>
     <div class="sp"></div><div id="goal"></div>
     <a class="btn small" href="tv.html" target="_blank" rel="noopener">📺 TV 화면</a>
-    <a class="btn small" href="print.html" target="_blank" rel="noopener">🖨️ A2 인쇄</a>
+    <a class="btn small" href="print.html?m=a4x4" target="_blank" rel="noopener">🖨️ A2 인쇄</a>
+    <a class="btn small" href="print.html?m=a4x8" target="_blank" rel="noopener">🖨️ A1 인쇄</a>
     <button class="btn small" id="lockq"></button>
     <button class="btn small" id="logout">나가기</button></header>
     <div id="banner"></div>

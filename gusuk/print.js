@@ -201,6 +201,6 @@ function fitPreview() {
   const t = TILE[P.mode], per = t ? t.cols : 1;
   const k = Math.min(1, (avail - (per - 1) * 18) / (w * per), (window.innerHeight * (t ? 0.9 / t.rows : 0.85)) / h);
   pages.forEach(p => { p.style.transform = `scale(${k})`; p.style.transformOrigin = 'top left'; p.style.marginRight = `${-w * (1 - k)}px`; p.style.marginBottom = `${-h * (1 - k)}px`; });
-  $('#pages').style.maxWidth = t ? `${(w * k) * t.cols + 60}px` : '';
+  $('#pages').style.maxWidth = t ? `${(w * k) * t.cols + 18 * (t.cols - 1) + 50}px` : '';
   $('#pages').style.margin = '0 auto';
 }

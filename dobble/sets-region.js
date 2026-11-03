@@ -4,7 +4,8 @@
    - 그림: dobble/img/region/ (공공누리 1~4유형 · 출처 표시, 원본 그대로 크기만 줄임)
    - src 칸의 출처는 '출처 모음' 화면(sources.html)에 그대로 나옴
    - intact: 그림을 찌그러뜨리거나 색을 바꾸지 않음 (3·4유형 '변경 금지' 지키기)
-   - 지자체 캐릭터 그림 49개 + 그림 없는 지역 자랑 낱말 8개 = 57개 → 카드 한 장에 8개씩
+   - 지자체 캐릭터 그림 46개 + 그림 없는 지역 자랑 낱말 11개 = 57개 → 카드 한 장에 8개씩
+     (경주·청도·포천은 캐릭터 그림이 작아 알아보기 어려워 낱말로 바꿈)
      (낱말 칸의 visit 는 '출처 모음'에서 대한민국 구석구석 검색어로 쓰임)
    - 아래 HOLD 8개 캐릭터는 엑셀에 '이용허락 미확인 · 담당부서 확인 필요'로 적혀 있어 넣지 않음
      (확인되면 그림을 img/region/ 에 넣고 낱말 한 줄을 그림 줄로 바꾸면 됨)
@@ -12,7 +13,7 @@
 SETS.push({
   id: 'soc-region',
   name: '사회 · 우리 지역 알리기',
-  desc: '지자체 캐릭터 49개 + 지역 자랑 낱말 8개 · 카드 한 장에 8개',
+  desc: '지자체 캐릭터 46개 + 지역 자랑 낱말 11개 · 카드 한 장에 8개',
   show: 'both',
   intact: true,
   symbols: [
@@ -78,26 +79,6 @@ SETS.push({
    },
    {
     "img": "img/region/region-04.webp",
-    "w": "경주시",
-    "m": "hard",
-    "note": "관이·금이와 친구들 · 신라 역사·문화",
-    "src": {
-     "org": "경주시",
-     "char": "관이·금이와 친구들",
-     "feat": "신라 역사·문화",
-     "cat": "역사·문화·건축",
-     "kogl": 3,
-     "title": "",
-     "kind": "공식 사이트 공개 미리보기 전체(고해상도 다운로드 원본 아님)",
-     "page": "https://www.kogl.or.kr/recommend/recommendDivView.do?division=img&recommendIdx=142521",
-     "file": "https://www.kogl.or.kr/upload_recommend/이미지/캐릭터,로고/캐릭터,로고/13_thumnailList_5280.jpg",
-     "extra": "",
-     "conv": "전체 사각 프레임 비율 유지 축소(215×300)·전체 이미지 추가 축소 + PNG 무손실 압축·512 정사각 바깥 여백 추가 / 앱용: 바깥 여백만 잘라 냄, 비율 유지 384px 이하로 크기 조정, 무손실 WebP",
-     "date": "2026-11-03"
-    }
-   },
-   {
-    "img": "img/region/region-05.webp",
     "w": "공주시",
     "m": "hard",
     "note": "고마곰과 공주 · 곰나루 전설·백제문화",
@@ -117,7 +98,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-06.webp",
+    "img": "img/region/region-05.webp",
     "w": "금산군",
     "m": "jelly",
     "note": "삼삼이 · 금산 인삼",
@@ -137,7 +118,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-07.webp",
+    "img": "img/region/region-06.webp",
     "w": "김포시",
     "m": "jelly",
     "note": "포수·포미 · 물·운하와 김포금쌀",
@@ -157,7 +138,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-08.webp",
+    "img": "img/region/region-07.webp",
     "w": "김해시",
     "m": "hard",
     "note": "토더기 · 오리 모양 토기",
@@ -177,7 +158,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-09.webp",
+    "img": "img/region/region-08.webp",
     "w": "대구 달성군",
     "m": "light",
     "note": "비슬이 · 비슬산 참꽃",
@@ -197,7 +178,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-10.webp",
+    "img": "img/region/region-09.webp",
     "w": "대구 서구",
     "m": "hard",
     "note": "도약이·미래 · 지역의 발전과 미래",
@@ -217,7 +198,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-11.webp",
+    "img": "img/region/region-10.webp",
     "w": "무안군",
     "m": "jelly",
     "note": "무아니 · 무안 양파",
@@ -237,7 +218,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-12.webp",
+    "img": "img/region/region-11.webp",
     "w": "보성군",
     "m": "jelly",
     "note": "녹차몬(BS삼총사) · 보성 녹차",
@@ -257,7 +238,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-13.webp",
+    "img": "img/region/region-12.webp",
     "w": "보은군",
     "m": "jelly",
     "note": "대추씨 · 보은 대추",
@@ -277,7 +258,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-14.webp",
+    "img": "img/region/region-13.webp",
     "w": "봉화군",
     "m": "jelly",
     "note": "솔봉이·솔향이 · 송이버섯·춘양목",
@@ -297,7 +278,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-15.webp",
+    "img": "img/region/region-14.webp",
     "w": "부산 기장군",
     "m": "jelly",
     "note": "기장프렌즈 · 기장 먹거리·관광",
@@ -317,7 +298,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-16.webp",
+    "img": "img/region/region-15.webp",
     "w": "부산 동래구",
     "m": "hard",
     "note": "뚜미(뚜기·뚜미 계열) · 동래의 전통문화",
@@ -337,7 +318,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-17.webp",
+    "img": "img/region/region-16.webp",
     "w": "부산 사하구",
     "m": "light",
     "note": "고우니 · 을숙도 고니·철새 생태",
@@ -357,7 +338,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-18.webp",
+    "img": "img/region/region-17.webp",
     "w": "부산 수영구",
     "m": "hard",
     "note": "모리 · 광안리와 광안대교",
@@ -377,7 +358,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-19.webp",
+    "img": "img/region/region-18.webp",
     "w": "부산 영도구",
     "m": "light",
     "note": "영독·영도롱이 · 영도의 섬 관광",
@@ -397,7 +378,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-20.webp",
+    "img": "img/region/region-19.webp",
     "w": "사천시",
     "m": "light",
     "note": "또아 · 사천 우주항공 산업",
@@ -417,7 +398,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-21.webp",
+    "img": "img/region/region-20.webp",
     "w": "상주시",
     "m": "jelly",
     "note": "감돌이·감순이 · 상주 곶감",
@@ -437,7 +418,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-22.webp",
+    "img": "img/region/region-21.webp",
     "w": "서산시",
     "m": "hard",
     "note": "가티·오슈 · 서산 관광 캐릭터",
@@ -457,7 +438,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-23.webp",
+    "img": "img/region/region-22.webp",
     "w": "서울 관악구",
     "m": "hard",
     "note": "강감찬 · 낙성대·강감찬 장군",
@@ -477,7 +458,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-24.webp",
+    "img": "img/region/region-23.webp",
     "w": "서울 동대문구",
     "m": "hard",
     "note": "디디미 · 흥인지문 처마",
@@ -497,7 +478,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-25.webp",
+    "img": "img/region/region-24.webp",
     "w": "순천시",
     "m": "light",
     "note": "루미·뚱이 · 흑두루미·순천만 생태",
@@ -517,7 +498,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-26.webp",
+    "img": "img/region/region-25.webp",
     "w": "아산시",
     "m": "hard",
     "note": "충온이 · 아산의 이순신 역사",
@@ -537,7 +518,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-27.webp",
+    "img": "img/region/region-26.webp",
     "w": "여수시",
     "m": "light",
     "note": "다섬이 · 여수의 섬·세계섬박람회",
@@ -557,7 +538,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-28.webp",
+    "img": "img/region/region-27.webp",
     "w": "영천시",
     "m": "light",
     "note": "별이·빛이 · 별의 도시 영천",
@@ -577,7 +558,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-29.webp",
+    "img": "img/region/region-28.webp",
     "w": "예산군",
     "m": "jelly",
     "note": "예돌이 · 예산 사과",
@@ -597,7 +578,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-30.webp",
+    "img": "img/region/region-29.webp",
     "w": "옥천군",
     "m": "jelly",
     "note": "송글이·송알이 · 옥천 포도",
@@ -617,7 +598,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-31.webp",
+    "img": "img/region/region-30.webp",
     "w": "울산 울주군",
     "m": "light",
     "note": "해뜨미 · 간절곶 해돋이",
@@ -637,7 +618,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-32.webp",
+    "img": "img/region/region-31.webp",
     "w": "의정부시",
     "m": "hard",
     "note": "의돌이 · 의정부 지명과 역사",
@@ -657,7 +638,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-33.webp",
+    "img": "img/region/region-32.webp",
     "w": "익산시",
     "m": "hard",
     "note": "마룡이 · 백제 무왕·서동 전설",
@@ -677,7 +658,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-34.webp",
+    "img": "img/region/region-33.webp",
     "w": "인제군",
     "m": "light",
     "note": "수달이 · 청정 하천의 수달",
@@ -697,7 +678,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-35.webp",
+    "img": "img/region/region-34.webp",
     "w": "인천 강화군",
     "m": "hard",
     "note": "고인돌 캐릭터 · 강화 고인돌 유산",
@@ -717,7 +698,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-36.webp",
+    "img": "img/region/region-35.webp",
     "w": "장수군",
     "m": "jelly",
     "note": "사과랑 · 장수 사과",
@@ -737,7 +718,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-37.webp",
+    "img": "img/region/region-36.webp",
     "w": "장흥군",
     "m": "jelly",
     "note": "표동이 · 장흥 표고버섯",
@@ -757,7 +738,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-38.webp",
+    "img": "img/region/region-37.webp",
     "w": "전주시",
     "m": "jelly",
     "note": "배대감 · 전주 배",
@@ -777,7 +758,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-39.webp",
+    "img": "img/region/region-38.webp",
     "w": "증평군",
     "m": "hard",
     "note": "김득신 · 독서왕 김득신",
@@ -797,7 +778,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-40.webp",
+    "img": "img/region/region-39.webp",
     "w": "진도군",
     "m": "hard",
     "note": "진도 프렌즈 · 진도개·진도 민속문화",
@@ -817,7 +798,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-41.webp",
+    "img": "img/region/region-40.webp",
     "w": "진안군",
     "m": "jelly",
     "note": "빠망 · 마이산·진안 홍삼",
@@ -837,7 +818,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-42.webp",
+    "img": "img/region/region-41.webp",
     "w": "진천군",
     "m": "hard",
     "note": "원화랑·원낭자 · 진천 화랑문화",
@@ -857,27 +838,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-43.webp",
-    "w": "청도군",
-    "m": "hard",
-    "note": "카우·붕가 · 청도 소싸움 문화",
-    "src": {
-     "org": "청도군",
-     "char": "카우·붕가",
-     "feat": "청도 소싸움 문화",
-     "cat": "역사·문화·건축",
-     "kogl": 4,
-     "title": "청도 카우과 붕가 캐릭터",
-     "kind": "공공누리 공식 공개 표시 이미지 전체(로그인 고해상도 원본 아님)",
-     "page": "https://www.kogl.or.kr/recommend/recommendDivView.do?division=img&recommendIdx=139293",
-     "file": "https://www.kogl.or.kr/upload_recommend/이미지/캐릭터,로고/캐릭터,로고/카우와붕가2001_thumnailList_4567.jpg",
-     "extra": "",
-     "conv": "그림·배경·문구·여백 전체 보존 / 비율 유지 크기조정 325×460 / PNG 무손실 저장 / 바깥 정사각 여백 추가 / 앱용: 바깥 여백만 잘라 냄, 비율 유지 384px 이하로 크기 조정, 무손실 WebP",
-     "date": "2026-11-03"
-    }
-   },
-   {
-    "img": "img/region/region-44.webp",
+    "img": "img/region/region-42.webp",
     "w": "태백시",
     "m": "light",
     "note": "태붐이 · 태백산 호랑이·눈·발원지",
@@ -897,7 +858,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-45.webp",
+    "img": "img/region/region-43.webp",
     "w": "파주시",
     "m": "jelly",
     "note": "파랑이(장단콩) · 파주 장단콩",
@@ -917,27 +878,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-46.webp",
-    "w": "포천시",
-    "m": "hard",
-    "note": "오성·한음 · 포천의 역사인물 오성과 한음",
-    "src": {
-     "org": "포천시",
-     "char": "오성·한음",
-     "feat": "포천의 역사인물 오성과 한음",
-     "cat": "역사·문화·건축",
-     "kogl": 4,
-     "title": "포천시 캐릭터(오성과 한음)(리뉴얼)",
-     "kind": "공공누리 공식 공개 표시 이미지 전체(로그인 고해상도 원본 아님)",
-     "page": "https://www.kogl.or.kr/recommend/recommendDivView.do?division=img&recommendIdx=88139",
-     "file": "https://www.kogl.or.kr/upload_recommend/이미지/캐릭터,로고/캐릭터,로고/OhsungAndhanum_png_thumnailList_7014.png",
-     "extra": "",
-     "conv": "그림·배경·문구·여백 전체 보존 / 비율 유지 크기조정 237×420 / PNG 무손실 저장 / 바깥 정사각 여백 추가 / 앱용: 바깥 여백만 잘라 냄, 비율 유지 384px 이하로 크기 조정, 무손실 WebP",
-     "date": "2026-11-03"
-    }
-   },
-   {
-    "img": "img/region/region-47.webp",
+    "img": "img/region/region-44.webp",
     "w": "해남군",
     "m": "light",
     "note": "땅끝이·희망이 · 땅끝마을·해남 자연",
@@ -957,7 +898,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-48.webp",
+    "img": "img/region/region-45.webp",
     "w": "홍성군",
     "m": "jelly",
     "note": "복돌이 · 홍성의 돼지",
@@ -977,7 +918,7 @@ SETS.push({
     }
    },
    {
-    "img": "img/region/region-49.webp",
+    "img": "img/region/region-46.webp",
     "w": "화성시",
     "m": "light",
     "note": "코리요 · 화성에서 발견된 공룡",
@@ -1043,6 +984,24 @@ SETS.push({
     "m": "hard",
     "note": "경기 이천 · 도자기",
     "visit": "이천 도자기"
+   },
+   {
+    "w": "경주첨성대",
+    "m": "hard",
+    "note": "경북 경주 · 첨성대",
+    "visit": "경주 첨성대"
+   },
+   {
+    "w": "청도소싸움",
+    "m": "heavy",
+    "note": "경북 청도 · 소싸움 축제",
+    "visit": "청도 소싸움"
+   },
+   {
+    "w": "포천이동갈비",
+    "m": "heavy",
+    "note": "경기 포천 · 이동갈비",
+    "visit": "포천 이동갈비"
    }
   ]
 });

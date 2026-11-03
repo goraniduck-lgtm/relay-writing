@@ -60,7 +60,7 @@ for (const set of SETS) for (const x of set.symbols) if (x.img) {
 }
 const region = SETS.find(s => s.id === 'soc-region');
 ok('지역 세트 57개 → 카드 8개씩', region && region.symbols.length === 57 && D.makeGame(region, 5, 0).per === 8);
-ok('지역 세트: 그림 49 + 낱말 8', region.symbols.filter(x => x.img).length === 49 && region.symbols.filter(x => !x.img && x.w && x.note && x.visit).length === 8);
+ok('지역 세트: 그림 46 + 낱말 11', region.symbols.filter(x => x.img).length === 46 && region.symbols.filter(x => !x.img && x.w && x.note && x.visit).length === 11);
 ok('지역 세트: 낱말이 겹치지 않음', new Set(region.symbols.map(x => x.w)).size === 57);
 /* 씨앗이 다르면 다른 판 */
 const s0 = SETS[0];

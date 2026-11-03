@@ -109,7 +109,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   }
   await Promise.all([A, B].map(p => p.waitForFunction(() => G.ended, null, { timeout: 15000 }).catch(() => {})));
   const [fa, fb] = [await state(A), await state(B)];
-  ok('두 태블릿 모두 끝남', fa.ended && fb.ended, JSON.stringify([fa, fb]));
+  ok('두 태블릿 모두 끝남', fa.ended && fb.ended, JSON.stringify([fa, fb]) + '\n' + errors.join('\n'));
   ok('판 기록이 두 태블릿에서 같음', fa.claims === fb.claims && fa.claims.length === 13, fa.claims + ' / ' + fb.claims);
   ok('점수 같음', JSON.stringify(fa.scores) === JSON.stringify(fb.scores), JSON.stringify([fa.scores, fb.scores]));
   ok('점수 합 = 판 수', fa.scores.a + fa.scores.b === 13);

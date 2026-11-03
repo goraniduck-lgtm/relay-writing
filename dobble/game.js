@@ -297,6 +297,7 @@ function setupGame(cfg, claims) {
   pl.style.setProperty('--me', G.mode === 'solo' ? GAME.colors.a : GAME.colors[G.seat]);
   pl.style.setProperty('--opp', G.mode === 'solo' ? GAME.colors.b : GAME.colors[G.opp]);
   $('#oppBar').classList.toggle('solo', G.mode === 'solo');
+  pl.classList.toggle('intact', !!G.set.intact);
   $('#oppMini').hidden = G.mode === 'solo';
   $('#myName').textContent = G.mode === 'solo' ? (nickOf() || '나') : seatName(G.seat);
   $('#oppName').textContent = G.mode === 'solo' ? '⏱ 0.0초' : seatName(G.opp);
@@ -342,7 +343,7 @@ function symHtml(i) {
   const s = G.set.symbols[i], mode = G.set.show, e = emojiOf(s);
   if (s.img) {
     const img = `<img src="${esc(s.img)}" alt="${esc(s.w || '')}" draggable="false">`;
-    return mode === 'both' && s.w ? { cls: 'both', html: img + `<span class="w">${esc(s.w)}</span>` } : { cls: '', html: img };
+    return mode === 'both' && s.w ? { cls: 'both pic', html: img + `<span class="w">${esc(s.w)}</span>` } : { cls: 'pic', html: img };
   }
   if (!e || mode === 'word') { const len = Math.max(1, [...(s.w || '')].length); return { cls: 'word', html: `<span class="w" style="--wf:${clamp(.95 / len, .2, .48).toFixed(3)}">${esc(s.w)}</span>` }; }
   if (mode === 'both' && s.w) return { cls: 'both', html: `<span class="e">${esc(e)}</span><span class="w">${esc(s.w)}</span>` };
@@ -420,7 +421,7 @@ async function oppTake(w) {
   if (gen !== G.gen) return;
   applyRound(w);
   renderAll(); renderCenter(true);
-  $('#oppMini').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.3,.8)' }, { transform: 'scale(.9,1.12)' }, { transform: 'scale(1)' }], { duration: 280 });
+  $('#oppMini').animate([{ transform: 'scale(1)' }, { transform: sqz(1.3, .8) }, { transform: sqz(.9, 1.12) }, { transform: 'scale(1)' }], { duration: 280 });
   FX.tone(150, .14, 'sine', .2, 70);
   FX.setOpp(oppStreak());
   G.roundStart = performance.now();
@@ -428,6 +429,9 @@ async function oppTake(w) {
 }
 
 /* ================= 누르기 ================= */
+/* intact 세트(변경 금지 그림)는 가로세로를 따로 늘이지 않고 같은 비율로만 키우고 줄임 */
+const S2 = (x, y) => { if (G.set && G.set.intact) { const u = 1 + (y - x) * .3; return [u, u]; } return [x, y]; };
+const sqz = (x, y) => { const [a, b] = S2(x, y); return `scale(${(+a).toFixed(3)},${(+b).toFixed(3)})`; };
 const setv = (el, o) => { for (const k in o) el.style.setProperty('--' + k, o[k]); };
 const center = el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
 
@@ -438,10 +442,11 @@ cM.addEventListener('pointerdown', e => {
   e.preventDefault();
   G.pressed = s; G.pressId = e.pointerId;
   const sid = +s.dataset.s, m = matOf(G.set, sid);
-  $('#info').textContent = `${symName(G.set, sid)} · ${m.name}`;
+  const sy0 = G.set.symbols[sid];
+  $('#info').textContent = sy0.note ? `${symName(G.set, sid)} · ${sy0.note}` : `${symName(G.set, sid)} · ${m.name}`;
   FX.tone(m.press[0] * J(), .07, m.press[1], m.press[1] === 'square' ? .07 : .22, m.press[0] * .35);
   s.style.transition = 'transform 45ms ease-out'; s.classList.add('hold');
-  setv(s, { sx: (m.squash[0] * J()).toFixed(3), sy: (m.squash[1] / J()).toFixed(3) });
+  { const [qx, qy] = S2(m.squash[0] * J(), m.squash[1] / J()); setv(s, { sx: qx.toFixed(3), sy: qy.toFixed(3) }); }
   setTimeout(() => { if (G.pressed === s) { s.style.transition = ''; setv(s, { sx: m.hold, sy: m.hold }); } }, 55);
   const a = m.jitter * 1.5;
   G.jit = s.animate([{ translate: '0 0' }, { translate: `${a}px ${-a * .7}px` }, { translate: `${-a}px ${a * .7}px` }, { translate: `${a * .7}px ${a}px` }, { translate: '0 0' }], { duration: m.jitterMs, iterations: Infinity, delay: 180 });
@@ -535,7 +540,7 @@ async function hitWin(fl, s, tgt, dx, dy, m, power, r) {
   const lvl = Math.min(G.combo, 5), k = 1 + lvl * .08, n = Math.hypot(dx, dy) || 1, imp = m.impact * power;
   fl.remove();
   tgt.style.transition = 'none'; tgt.classList.add('good');
-  setv(tgt, { sx: (1 + .45 * imp).toFixed(2), sy: Math.max(.4, 1 - .35 * imp).toFixed(2) });
+  { const [qx, qy] = S2(1 + .45 * imp, Math.max(.4, 1 - .35 * imp)); setv(tgt, { sx: qx.toFixed(2), sy: qy.toFixed(2) }); }
   FX.tone(m.hit[0], .18, m.hit[1], m.hit[2], m.hit[3]); FX.tone(660 * k, .12, 'triangle', .16);
   const [tx, ty] = center(tgt);
   FX.ring(tx, ty, '#EF9F27', (100 + lvl * 20) * Math.min(imp, 1.8), 300);
@@ -562,7 +567,7 @@ async function hitWin(fl, s, tgt, dx, dy, m, power, r) {
   applyRound(G.seat);
   renderAll(); renderCenter(true);
   FX.tone(130, .18, 'sine', .35, 60);
-  cM.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08,.9)' }, { transform: 'scale(.97,1.04)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
+  cM.animate([{ transform: 'scale(1)' }, { transform: sqz(1.08, .9) }, { transform: sqz(.97, 1.04) }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
   const [px, py] = center(cM);
   FX.burst(px, py + cM.offsetHeight * .45, 8, 60);
   FX.setOpp(0);
@@ -591,7 +596,7 @@ async function bounce(fl, s, dx, dy, m) {
   FX.ring(cx, cy, '#E24B4A', 70, 280);
   const back = 38 * (m.arc / 50), bd = m.impact > 1.3 ? 460 : m.impact < .8 ? 340 : 400;
   await done(fl.animate([
-    { transform: `translate(-50%,-50%) translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) scale(${(1 + .3 * m.impact).toFixed(2)},${Math.max(.45, 1 - .4 * m.impact).toFixed(2)})` },
+    { transform: `translate(-50%,-50%) translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) ${sqz(1 + .3 * m.impact, Math.max(.45, 1 - .4 * m.impact))}` },
     { transform: `translate(-50%,-50%) translate(${(dx * .45).toFixed(1)}px,${(dy * .45 - back).toFixed(1)}px) rotate(${-m.spin * .6}deg) scale(1)`, offset: .5 },
     { transform: `translate(-50%,-50%) rotate(${-m.spin}deg) scale(.95)` }
   ], { duration: bd, easing: 'cubic-bezier(.2,.7,.4,1)', fill: 'forwards' }));

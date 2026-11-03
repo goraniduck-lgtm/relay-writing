@@ -3,7 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const D = require('../deck.js');
-const SETS = new Function(fs.readFileSync(path.join(__dirname, '..', 'sets.js'), 'utf8') + '; return SETS;')();
+const rd = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const SETS = new Function(rd('sets.js') + ';\n' + rd('sets-region.js') + '; return SETS;')();
 const MATS = ['heavy', 'light', 'jelly', 'hard'];
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) pass++; else { fail++; console.log('✗', name); } };
@@ -52,6 +53,13 @@ for (const set of SETS) {
     }
   }
 }
+/* 그림 파일 세트: 파일이 있고 출처가 빠짐없이 있음 */
+for (const set of SETS) for (const x of set.symbols) if (x.img) {
+  ok(`${set.id} 그림 파일 ${x.img}`, fs.existsSync(path.join(__dirname, '..', x.img)));
+  if (set.id === 'soc-region') ok(`${x.w} 출처`, x.src && x.src.org && x.src.char && x.src.page && [1, 2, 3, 4].includes(x.src.kogl) && x.note);
+}
+const region = SETS.find(s => s.id === 'soc-region');
+ok('지역 세트 49개 → 카드 6개씩', region && region.symbols.length === 49 && D.makeGame(region, 5, 0).per === 6);
 /* 씨앗이 다르면 다른 판 */
 const s0 = SETS[0];
 ok('씨앗이 다르면 순서가 다름', JSON.stringify(D.makeGame(s0, 1, 0).deck) !== JSON.stringify(D.makeGame(s0, 2, 0).deck));

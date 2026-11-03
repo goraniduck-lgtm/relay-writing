@@ -134,7 +134,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const ra = await state(A);
   ok('다시 하기: 점수 0부터', ra.scores.a === 0 && ra.scores.b === 0 && ra.claims === '');
   ok('다시 하기: 같은 가운데 카드', JSON.stringify(await A.evaluate(() => centerCard())) === JSON.stringify(await B.evaluate(() => centerCard())));
-  for (let i = 0; i < 3; i++) { await idle(A); await press(A, true, 40); await sleep(200); }
+  await B.evaluate(() => { window.__oppShots = 0; new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.classList && n.classList.contains('opp')) window.__oppShots++; }))).observe(document.querySelector('#fly'), { childList: true }); });
+  for (let i = 0; i < 3; i++) {
+    await idle(A); await press(A, true, 40);
+    if (i === 1) { await B.bringToFront(); await sleep(170); await shot(B, '7a-opp-shot'); await sleep(140); await shot(B, '7a-opp-hit'); }
+    await sleep(200);
+  }
   await idle(A);
   const ca = await state(A);
   ok('연속 3번 → 콤보 3', ca.combo === 3 && ca.scores.a === 3, JSON.stringify(ca));
@@ -143,6 +148,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await shot(B, '7-opp-view');
   const cb = await state(B);
   ok('B 화면에서도 A 3장', cb.scores.a === 3);
+  ok('B 화면에 A가 날린 그림이 3번 보임', (await B.evaluate(() => window.__oppShots)) >= 3, await B.evaluate(() => window.__oppShots));
 
   /* 연속 터치 막기 */
   await idle(A);

@@ -414,6 +414,8 @@ async function oppTake(w) {
   G.busy = true; cancelPress();
   if (G.combo) setCombo(0);
   const gen = G.gen;
+  await oppShot(w, gen);
+  if (gen !== G.gen) return;
   const a = cC.getBoundingClientRect(), b = $('#oppMini').getBoundingClientRect();
   const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2), sc = b.width / a.width;
   FX.tone(500, .25, 'sine', .07, 160);
@@ -426,6 +428,52 @@ async function oppTake(w) {
   FX.setOpp(oppStreak());
   G.roundStart = performance.now();
   G.busy = false;
+}
+
+/* 상대가 맞힌 그림이 상대 카드에서 날아와 가운데 카드에 부딪힘 (상대 색으로) */
+async function oppShot(w, gen) {
+  const sid = commonOf(G.tops[w], centerCard());
+  const tgt = cC.querySelector(`.sy[data-s="${sid}"]`);
+  if (!tgt) return;
+  const from = $('#oppMini').querySelector(`.sy[data-s="${sid}"]`);
+  const m = matOf(G.set, sid), color = GAME.colors[w];
+  const halo = `color-mix(in srgb, ${color} 30%, transparent)`;
+  const [tx, ty] = center(tgt), [sx, sy] = center(from || $('#oppMini'));
+  const dx = tx - sx, dy = ty - sy;
+  const tw = tgt.getBoundingClientRect().width || 1;
+  const s0 = from ? Math.max(.12, from.getBoundingClientRect().width / tw) : .2;
+  const r1 = parseFloat(tgt.style.getPropertyValue('--r')) || 0, r0 = r1 - m.spin;
+  const fl = tgt.cloneNode(true);
+  fl.classList.remove('good', 'bad', 'hold', 'gone'); fl.classList.add('flyer', 'opp');
+  fl.style.cssText += `;left:${sx}px;top:${sy}px;--d:${cC.offsetWidth}px;transition:none;--halo:${halo}`;
+  $('#fly').appendChild(fl);
+  const dur = clamp(m.flight * .85, GAME.flightMin, GAME.flightMax), arc = m.arc * .6;
+  const frames = [0, .25, .5, .75, 1].map(t => {
+    const x = dx * t + (m.wave ? Math.sin(t * Math.PI * 2) * m.wave * .6 : 0), y = dy * t - arc * 4 * t * (1 - t);
+    const k = s0 + (1.1 - s0) * t + .15 * Math.sin(t * Math.PI);
+    return { transform: `translate(-50%,-50%) translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${(r0 + (r1 - r0) * t).toFixed(0)}deg) scale(${k.toFixed(3)})` };
+  });
+  FX.tone(m.whoosh[0], dur / 1000, 'sine', .06, m.whoosh[1]);
+  const anim = fl.animate(frames, { duration: dur, easing: 'cubic-bezier(.45,0,.95,.55)', fill: 'forwards' });
+  let flying = true;
+  (function trail() { if (!flying) return; const [x, y] = center(fl); FX.dot(x, y, m.trail * .8, color, 240); requestAnimationFrame(trail); })();
+  await done(anim);
+  flying = false; fl.remove();
+  if (gen !== G.gen) return;
+  /* 부딪힘 */
+  const imp = m.impact;
+  tgt.style.transition = 'none'; tgt.style.setProperty('--halo', halo);
+  { const [qx, qy] = S2(1 + .4 * imp, Math.max(.45, 1 - .3 * imp)); setv(tgt, { sx: qx.toFixed(2), sy: qy.toFixed(2) }); }
+  FX.tone(m.hit[0], .16, m.hit[1], m.hit[2] * .7, m.hit[3]);
+  FX.ring(tx, ty, color, 110 * Math.min(imp, 1.6), 300);
+  FX.burst(tx, ty, Math.round(8 * imp + 4), 70 * Math.min(imp, 1.4));
+  const n = Math.hypot(dx, dy) || 1, p = 7 * m.knock;
+  cC.animate([{ translate: '0 0', rotate: '0deg' }, { translate: `${(dx / n * p).toFixed(1)}px ${(dy / n * p).toFixed(1)}px`, rotate: `${dx > 0 ? 4 : -4}deg`, offset: .25 }, { translate: '0 0', rotate: '0deg' }], { duration: 320, easing: 'ease-out' });
+  FX.floatText(tx, ty - 34, `${seatName(w)} 먼저!`, color);
+  await wait(70);
+  if (gen !== G.gen) return;
+  tgt.style.transition = `transform ${m.spring[0]}ms ${m.spring[1]}`; setv(tgt, { sx: 1.25, sy: 1.25 });
+  await wait(180);
 }
 
 /* ================= 누르기 ================= */

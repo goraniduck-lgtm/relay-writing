@@ -24,7 +24,7 @@ body{background:#8E8A82;background-image:none}
 @media print{
   body{background:#fff}
   .bar{display:none}
-  .pages{display:block;padding:0}
+  .pages{display:block;padding:0;max-width:none!important;margin:0!important}
   .page{box-shadow:none;transform:none!important;margin:0!important;break-after:page;page-break-after:always}
   .page:last-child{break-after:auto;page-break-after:auto}
   *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -34,7 +34,7 @@ body{background:#8E8A82;background-image:none}
 <body>
 <div class="bar">
   <h1>🖨️ 출력물 만들기</h1>
-  <div class="grp"><span>크기</span><button class="chip" data-mode="a4x4">A4 4장 (이어 붙여 A2)</button><button class="chip" data-mode="a2">A2 1장</button><button class="chip" data-mode="a4">A4 1장 (축소)</button></div>
+  <div class="grp"><span>크기</span><button class="chip" data-mode="a4x4">A4 4장 (이어 붙여 A2)</button><button class="chip" data-mode="a4x8">A4 8장 (이어 붙여 A1)</button><button class="chip" data-mode="a2">A2 1장</button><button class="chip" data-mode="a4">A4 1장 (축소)</button></div>
   <div class="grp"><span>넣을 카드</span><button class="chip" data-inc="all">모든 카드</button><button class="chip" data-inc="ok">확인 완료만</button></div>
   <button class="btn primary" id="print">인쇄 / PDF로 저장</button>
   <div class="note" id="note"></div>
@@ -44,6 +44,6 @@ body{background:#8E8A82;background-image:none}
 <script src="mapdata.js?v=1"></script>
 <script src="common.js?v=1"></script>
 <script src="map.js?v=1"></script>
-<script src="print.js?v=1"></script>
+<script src="print.js?v=2"></script>
 </body>
 </html>

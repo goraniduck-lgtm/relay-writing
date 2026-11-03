@@ -5,7 +5,8 @@ const P = { cfg: {}, cards: {}, mode: ls.get('gusuk.pmode', 'a4x4'), inc: ls.get
 const PW = 420, PH = 594;              // A2 (mm)
 const M = 7, OV = 8;                   // A4 인쇄 여백, 겹쳐 붙이는 폭 (mm)
 const TW = 210 - 2 * M, TH = 297 - 2 * M;
-const SC = Math.min((2 * TW - OV) / PW, (2 * TH - OV) / PH);   // A4 4장일 때 줄임 비율
+/* A4 여러 장 이어 붙이기: A2 = A4 세로 2×2장, A1 = A4 가로 2×4장 */
+const TILE = { a4x4: { cols: 2, rows: 2, land: false, name: 'A2', w: 420 }, a4x8: { cols: 2, rows: 4, land: true, name: 'A1', w: 594 } };
 
 (async function init() {
   try { await DB.ready(); } catch (e) { $('#pages').innerHTML = '<div class="loading" style="color:#fff">연결하지 못했어요.</div>'; return; }
@@ -166,18 +167,23 @@ function draw() {
     h = page(210, 297, (210 - w) / 2, (297 - hh) / 2, w, hh, [0, 0, PW, PH], '');
     $('#note').textContent = `A4 한 장에 줄여 담아요 (학생 나눠 주기용). 카드 ${ps.n}장.`;
   } else {
-    css = '@page{size:A4 portrait;margin:0}';
-    const names = ['① 왼쪽 위', '② 오른쪽 위', '③ 왼쪽 아래', '④ 오른쪽 아래'];
-    for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
-      const i = r * 2 + c, x0 = c * (TW - OV) / SC, y0 = r * (TH - OV) / SC;
+    const t = P.mode === 'a4x8' ? TILE.a4x8 : TILE.a4x4;
+    css = `@page{size:A4 ${t.land ? 'landscape' : 'portrait'};margin:0}`;
+    const pw = t.land ? 297 : 210, ph = t.land ? 210 : 297, tw = pw - 2 * M, th = ph - 2 * M;
+    const aw = t.cols * tw - (t.cols - 1) * OV, ah = t.rows * th - (t.rows - 1) * OV;
+    const sc = Math.min(aw / PW, ah / PH), ox = (aw - PW * sc) / 2;
+    const N = '①②③④⑤⑥⑦⑧';
+    for (let r = 0; r < t.rows; r++) for (let c = 0; c < t.cols; c++) {
+      const i = r * t.cols + c, x0 = (c * (tw - OV) - ox) / sc, y0 = r * (th - OV) / sc;
       let ov = '';
-      if (c === 1) ov += `<line x1="${OV}" y1="0" x2="${OV}" y2="${TH}" stroke="#888" stroke-width=".3" stroke-dasharray="2 1.5"/><text x="${OV / 2}" y="${TH / 2}" font-size="3" fill="#888" text-anchor="middle" transform="rotate(-90 ${OV / 2} ${TH / 2})">✂ 자르고 ①${r ? '③' : ''} 위에 겹쳐 붙여요</text>`;
-      if (r === 1) ov += `<line x1="0" y1="${OV}" x2="${TW}" y2="${OV}" stroke="#888" stroke-width=".3" stroke-dasharray="2 1.5"/><text x="${TW / 2}" y="${OV / 2 + 1}" font-size="3" fill="#888" text-anchor="middle">✂ 자르고 위 장 아래쪽에 겹쳐 붙여요</text>`;
-      const lx = c === 1 ? TW - 2 : 2, ly = r === 1 ? TH - 2 : 5;
-      ov += `<text x="${lx}" y="${ly}" font-size="3.4" font-weight="800" fill="#aaa" text-anchor="${c === 1 ? 'end' : 'start'}">${names[i]}</text>`;
-      h += page(210, 297, M, M, TW, TH, [x0, y0, TW / SC, TH / SC], ov);
+      if (c > 0) ov += `<line x1="${OV}" y1="0" x2="${OV}" y2="${th}" stroke="#888" stroke-width=".3" stroke-dasharray="2 1.5"/><text x="${OV / 2}" y="${th / 2}" font-size="3" fill="#888" text-anchor="middle" transform="rotate(-90 ${OV / 2} ${th / 2})">✂ 자르고 왼쪽 장(${N[i - 1]}) 위에 겹쳐 붙여요</text>`;
+      if (r > 0) ov += `<line x1="0" y1="${OV}" x2="${tw}" y2="${OV}" stroke="#888" stroke-width=".3" stroke-dasharray="2 1.5"/><text x="${tw / 2}" y="${OV / 2 + 1}" font-size="3" fill="#888" text-anchor="middle">✂ 자르고 위 장(${N[i - t.cols]}) 아래쪽에 겹쳐 붙여요</text>`;
+      ov += `<text x="${c ? tw - 2 : 2}" y="${th - 2}" font-size="3.4" font-weight="800" fill="#aaa" text-anchor="${c ? 'end' : 'start'}">${N[i]} ${r + 1}째 줄 ${c ? '오른쪽' : '왼쪽'} (${t.rows * t.cols}장 중)</text>`;
+      h += page(pw, ph, M, M, tw, th, [x0, y0, tw / sc, th / sc], ov);
     }
-    $('#note').innerHTML = `A4 네 장을 <b>100%(실제 크기)</b>로 인쇄한 뒤, 점선을 잘라 ①②③④ 순서로 겹쳐 붙이면 약 ${Math.round(PW * SC / 10)}×${Math.round(PH * SC / 10)}cm 포스터가 돼요 (A2의 ${Math.round(SC * 100)}%). 정확한 A2가 필요하면 'A2 1장'을 PDF로 저장해 인쇄소에 맡기세요. 카드 ${ps.n}장.`;
+    const cm = v => Math.round(v / 10), pct = Math.round(PW * sc / t.w * 100);
+    $('#note').innerHTML = `A4 ${t.rows * t.cols}장을 ${t.land ? '<b>가로</b>로 ' : ''}<b>100%(실제 크기)</b>로 인쇄한 뒤, 점선을 잘라 ${N.slice(0, t.rows * t.cols)} 순서로 겹쳐 붙이면 약 ${cm(PW * sc)}×${cm(PH * sc)}cm 포스터가 돼요 (${t.name}의 ${pct}%). ` +
+      `프린터 여백(${M}mm)과 붙이는 폭(${OV}mm) 때문에 조금 작아요. 카드 ${ps.n}장.`;
   }
   $('#pagestyle').textContent = css;
   pages.innerHTML = h;
@@ -192,9 +198,9 @@ function fitPreview() {
   const avail = Math.max(300, window.innerWidth - 60);
   pages.forEach(p => { p.style.transform = ''; p.style.margin = ''; });
   const w = pages[0].getBoundingClientRect().width, h = pages[0].getBoundingClientRect().height;
-  const per = P.mode === 'a4x4' ? 2 : 1;
-  const k = Math.min(1, (avail - (per - 1) * 18) / (w * per), (window.innerHeight * (P.mode === 'a4x4' ? 0.45 : 0.85)) / h);
+  const t = TILE[P.mode], per = t ? t.cols : 1;
+  const k = Math.min(1, (avail - (per - 1) * 18) / (w * per), (window.innerHeight * (t ? 0.9 / t.rows : 0.85)) / h);
   pages.forEach(p => { p.style.transform = `scale(${k})`; p.style.transformOrigin = 'top left'; p.style.marginRight = `${-w * (1 - k)}px`; p.style.marginBottom = `${-h * (1 - k)}px`; });
-  $('#pages').style.maxWidth = P.mode === 'a4x4' ? `${(w * k) * 2 + 60}px` : '';
+  $('#pages').style.maxWidth = t ? `${(w * k) * t.cols + 60}px` : '';
   $('#pages').style.margin = '0 auto';
 }

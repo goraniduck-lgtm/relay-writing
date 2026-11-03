@@ -67,7 +67,7 @@
 - 교사(카드 관리·통계·설정): `https://goraniduck-lgtm.github.io/relay-writing/gusuk/teacher.html`
   - 처음 한 번 교사 계정 비밀번호로 들어가 8자리 PIN을 정함 → 그다음부터 PIN만
 - 교실 TV(발표 모드): `https://goraniduck-lgtm.github.io/relay-writing/gusuk/tv.html`
-- 인쇄(A4 4장 이어 붙이기 / A2 1장 / A4 1장): `https://goraniduck-lgtm.github.io/relay-writing/gusuk/print.html`
+- 인쇄(A4 4장 이어 붙여 A2 / A4 가로 8장 이어 붙여 A1 / A2 1장 / A4 1장): `https://goraniduck-lgtm.github.io/relay-writing/gusuk/print.html`
 - 지도: `gusuk/mapdata.js` — vuski/admdongkor ver20261001(통계청 행정동 경계)을 시·군·구로 합쳐 단순화 (`gusuk/tools/prep.py`, `build_map.py`)
   - 2026.7. 전남광주통합특별시, 인천 서해구·검단구·영종구·제물포구 반영. 일반구는 시로 합침, 울릉도·독도는 옮겨 그림
 - 데이터: 같은 Firebase 프로젝트의 `gusuk/` 아래 (cfg, secret, adm, dev, cards, trash). 보안 규칙: `gusuk/tools/rules.js`

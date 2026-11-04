@@ -99,4 +99,9 @@ function matOf(set, i) {
   let h = 0; for (const ch of (s.w || s.e || s.img || String(i))) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return MATERIALS[keys[h % keys.length]];
 }
+/* 자리와 판 길이 */
+const SEATS = ['a', 'b', 'c', 'd', 'e', 'f'];
+/* k명이 할 때 카드 장수: 나눠 주는 k장 + 한 사람이 per장쯤 가져갈 만큼 (세트 전체를 넘지 않게) */
+function deckLen(k, per, total) { return per ? Math.min(total, k + per * Math.max(k, 2)) : total; }
+const setTotal = set => symbolsFor(orderFor(set.symbols.length));
 const symName = (set, i) => set.symbols[i].w || set.symbols[i].e || '';

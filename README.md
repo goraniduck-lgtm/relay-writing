@@ -76,7 +76,8 @@
 
 ## 딱! 같은 그림 — 도블식 2인 대결 (`dobble/`)
 
-- 태블릿: `https://goraniduck-lgtm.github.io/relay-writing/dobble/` (방 만들기 → 네 자리 번호 / 방 들어가기 / 혼자 연습)
+- 태블릿: `https://goraniduck-lgtm.github.io/relay-writing/dobble/` (방 만들기 → 인원 2~6명 → 네 자리 번호 / 방 들어가기 / 혼자 연습)
+- 여러 명: 들어온 순서대로 a~f 자리(빨강·파랑·초록·노랑·보라·분홍). 2명 이상이면 시작 가능, 시작할 때 있는 사람이 참가자(`cfg.players`). 판 길이는 '한 명에 6/10장쯤/전체' → 인원에 맞춰 카드 장수 계산. 중간에 나가면 남은 사람끼리 계속, 다시 하기는 남은 사람만
 - 규칙: 내 카드와 가운데 카드에 똑같이 있는 그림을 눌렀다 떼면 날아가 부딪힘. 먼저 맞힌 쪽이 가운데 카드를 가져감(내 카드가 됨). 카드를 많이 모은 쪽이 이김
 - **그림 세트(과목별)**: `dobble/sets.js` — 그림 7·13·31·57개 → 카드 한 장에 3·4·6·8개. 이모지·낱말·그림 파일 가능
 - **사회 · 우리 지역 알리기** 세트: `dobble/sets-region.js` + `dobble/img/region/` (지자체 캐릭터 49개, 공공누리 1~4유형). 출처는 처음 화면 '출처 모음'(`dobble/sources.html`)에 그림마다 공공누리 유형·출처·구석구석 링크로 나옴. `intact: true` 세트는 그림을 찌그러뜨리거나 색을 바꾸지 않음(변경 금지). 이용허락 미확인 8개는 아직 뺌
@@ -87,4 +88,4 @@
 - **손맛 조절**: `dobble/feel.js` — 재질(무거움·가벼움·말랑함·단단함), 콤보 불, 틀렸을 때 잠김 시간, 기기 성능
 - 판정: `dobble/rooms/{번호}/claims/{판}` 에 먼저 쓴 자리만 받음(트랜잭션 + 보안 규칙). 점수·카드는 이 기록만으로 두 태블릿이 똑같이 계산
 - 보안 규칙: `dobble/tools/rules.js` → `node mafia/tools/build-rules.js` 로 합침
-- 시험: `node dobble/tools/test-deck.js`(카드 규칙) · `node dobble/tools/test-rules.js`(보안 규칙) · `node dobble/tools/test-play.js`(정적 서버를 띄운 뒤, 두 태블릿 동시 대결)
+- 시험: `node dobble/tools/test-deck.js`(카드 규칙) · `node dobble/tools/test-rules.js`(보안 규칙) · `node dobble/tools/test-play.js`(정적 서버를 띄운 뒤, 두 태블릿 동시 대결) · `node dobble/tools/test-multi.js 주소 4`(여러 명)

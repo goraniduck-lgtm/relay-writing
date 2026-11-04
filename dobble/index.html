@@ -11,7 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <div id="app">
@@ -41,6 +41,8 @@
     <header class="top"><button class="back" data-go="home" aria-label="처음으로">←</button><h2 id="makeTitle">방 만들기</h2></header>
     <h3>그림 세트</h3>
     <div class="sets" id="sets"></div>
+    <h3 id="maxH">인원 <small>태블릿 수</small></h3>
+    <div class="chips" id="maxes"></div>
     <h3>판 길이</h3>
     <div class="chips" id="lengths"></div>
     <button class="primary" id="makeGo">방 만들기</button>
@@ -61,15 +63,15 @@
     <div class="code-big" id="codeBig"></div>
     <p class="set-line" id="lobbySet"></p>
     <div class="players" id="players"></div>
+    <p class="hint small" id="lobbyHint"></p>
     <button class="primary" id="startBtn" disabled>시작!</button>
   </section>
 
   <!-- 게임 -->
   <section id="play" class="screen" hidden>
     <header class="bar opp" id="oppBar">
-      <span class="who"><i class="dot" id="oppDot"></i><b id="oppName"></b><em id="oppOff" hidden>연결 끊김</em></span>
-      <span class="count"><b id="oppScore">0</b>장</span>
-      <div class="mini card" id="oppMini"></div>
+      <div class="opps" id="opps"></div>
+      <span class="timer" id="soloTimer" hidden></span>
     </header>
     <main class="table" id="table">
       <div class="slot">
@@ -122,10 +124,10 @@
 
 <script src="sets.js?v=4"></script>
 <script src="sets-region.js?v=3"></script>
-<script src="feel.js?v=4"></script>
+<script src="feel.js?v=8"></script>
 <script src="deck.js?v=4"></script>
-<script src="common.js?v=4"></script>
+<script src="common.js?v=8"></script>
 <script src="fx.js?v=4"></script>
-<script src="game.js?v=7"></script>
+<script src="game.js?v=8"></script>
 </body>
 </html>

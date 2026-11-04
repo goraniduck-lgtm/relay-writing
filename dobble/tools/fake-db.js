@@ -30,7 +30,7 @@
       await delay(); tree = load();
       const ps = parts(path);
       if (ps[0] === 'dobble' && ps.length === 3 && v && getAt(tree, ps)) throw perm();      // 이미 있는 방
-      if (ps[3] === 'seats' && ps[4] === 'b' && getAt(tree, ps)) throw perm();
+      if (ps[3] === 'seats' && ps[4] && v && getAt(tree, ps)) throw perm();   // 이미 누가 앉은 자리
       tree = setAt(tree, ps, ts(v)); save();
     },
     async update(path, obj) { await delay(); tree = load(); obj = ts(obj); for (const [k, v] of Object.entries(obj)) tree = setAt(tree, parts(path + '/' + k), v); save(); },

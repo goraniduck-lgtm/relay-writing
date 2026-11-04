@@ -1,16 +1,19 @@
 /* 딱! 같은 그림 — 화면 흐름과 게임 진행
+   2~6명: 방 만든 사람이 인원을 고르고, 들어온 순서대로 a~f 자리에 앉음. 시작할 때 있는 사람이 참가자(cfg.players)
    대결 판정: rooms/{번호}/claims/{판} 에 먼저 쓴 자리가 그 판을 가짐 (서버가 하나만 받음)
-   점수·카드는 claims 만으로 두 태블릿이 똑같이 계산함 */
+   점수·카드는 claims 만으로 모든 태블릿이 똑같이 계산함 */
 'use strict';
 
 const G = {
-  mode: null, seat: null, opp: null, code: null, room: null, cfg: null, key: null, gen: 0,
+  mode: null, seat: null, players: [], opps: [], watch: false, code: null, room: null, cfg: null, key: null, gen: 0,
   set: null, game: null, start: 2, claims: [], shown: 0, tops: {}, scores: {},
   combo: 0, best: 0, busy: false, locked: false, playing: false, ended: false,
   pressed: null, pressId: null, jit: null, pending: null, syncing: false, roundStart: 0, unsub: null, clock: null, t0: 0,
-  readyAt: 0, oppGone: false, joining: false
+  readyAt: 0, oppGone: false, joining: false, gone: {}
 };
-const make = { mode: 'duo', set: ls.get('dobble.set', SETS[0].id), len: ls.get('dobble.len', 25) };
+const make = { mode: 'duo', set: ls.get('dobble.set', SETS[0].id), per: ls.get('dobble.per', 10), max: ls.get('dobble.max', 2) };
+if (!GAME.lengths.some(l => l.per === make.per)) make.per = 10;
+make.max = clamp(+make.max || 2, 2, GAME.maxPlayers);
 const roomPath = () => `${ROOT}/rooms/${G.code}`;
 const cC = $('#cC'), cM = $('#cM'), table = $('#table');
 
@@ -76,8 +79,8 @@ function ask(title, sub, btns) {
   cancelPress();
 }
 function askQuit() {
-  const duo = G.mode === 'duo' && G.room && G.room.seats && G.room.seats.b;
-  ask('게임을 그만할까요?', duo ? '친구 화면에는 "친구가 나갔어요"가 떠요' : '', [
+  const duo = G.mode === 'duo' && activeOthers().length > 0;
+  ask('게임을 그만할까요?', duo ? '친구들 화면에는 "친구가 나갔어요"가 떠요' : '', [
     { label: '계속하기', main: true },
     { label: '나가기', fn: quitGame }
   ]);
@@ -105,14 +108,18 @@ function renderMake() {
     const pv = s.symbols.slice(0, 8).map(x => x.img ? `<img src="${esc(x.img)}" alt="">` : esc(s.show === 'word' ? x.w : (emojiOf(x) || x.w))).join(s.show === 'word' ? ' · ' : '');
     return `<button class="set${s.id === make.set ? ' on' : ''}" data-set="${esc(s.id)}"><b>${esc(s.name)}</b><span class="pv">${pv}</span><small>${esc(s.desc || '')}</small></button>`;
   }).join('');
-  const total = symbolsFor(orderFor(setById(make.set).symbols.length));
+  const total = setTotal(setById(make.set)), solo = make.mode === 'solo', k = solo ? 1 : make.max;
+  $('#maxH').hidden = $('#maxes').hidden = solo;
+  $('#maxes').innerHTML = Array.from({ length: GAME.maxPlayers - 1 }, (_, i) => i + 2).map(n => `<button class="chip${n === make.max ? ' on' : ''}" data-max="${n}">${n}명</button>`).join('');
   $('#lengths').innerHTML = GAME.lengths.map(l => {
-    const n = l.n && l.n < total ? l.n : total;
-    return `<button class="chip${l.n === make.len ? ' on' : ''}" data-len="${l.n}">${esc(l.name)}<small>${n}장</small></button>`;
+    const n = deckLen(k, l.per, total), each = Math.floor((n - k) / Math.max(k, 1));
+    const sub = solo ? `${n}장` : `${n}장 · 한 명에 ${each}장쯤`;
+    return `<button class="chip${l.per === make.per ? ' on' : ''}" data-len="${l.per}">${esc(l.name)}<small>${sub}</small></button>`;
   }).join('');
 }
+$('#maxes').addEventListener('click', e => { const b = e.target.closest('[data-max]'); if (!b) return; make.max = +b.dataset.max; ls.set('dobble.max', make.max); renderMake(); });
 $('#sets').addEventListener('click', e => { const b = e.target.closest('[data-set]'); if (!b) return; make.set = b.dataset.set; ls.set('dobble.set', make.set); renderMake(); });
-$('#lengths').addEventListener('click', e => { const b = e.target.closest('[data-len]'); if (!b) return; make.len = +b.dataset.len; ls.set('dobble.len', make.len); renderMake(); });
+$('#lengths').addEventListener('click', e => { const b = e.target.closest('[data-len]'); if (!b) return; make.per = +b.dataset.len; ls.set('dobble.per', make.per); renderMake(); });
 $('#makeGo').addEventListener('click', () => { fsAuto(); if (make.mode === 'solo') startSolo(); else createRoom(); });
 $('#sets').addEventListener('click', () => preloadSet(setById(make.set)));
 const newSeed = () => 1 + Math.floor(Math.random() * 2147483000);
@@ -141,7 +148,8 @@ async function createRoom() {
     const nick = nickOf();
     for (let i = 0; i < 8; i++) {
       const code = String(1000 + Math.floor(Math.random() * 9000));
-      const room = { ts: DB.TS, seats: { a: uid }, cfg: { set: make.set, n: make.len, seed: newSeed(), st: 'wait' } };
+      const n = deckLen(make.max, make.per, setTotal(setById(make.set)));
+      const room = { ts: DB.TS, seats: { a: uid }, cfg: { set: make.set, n, per: make.per, max: make.max, seed: newSeed(), st: 'wait' } };
       if (nick) room.names = { a: nick };
       try { await DB.set(`${ROOT}/rooms/${code}`, room); } catch (e) { continue; }
       enterRoom(code, 'a');
@@ -166,19 +174,24 @@ async function tryJoin(code) {
   try {
     const uid = (await DB.ready()).uid;
     const room = await DB.get(`${ROOT}/rooms/${code}`);
-    if (!room || !room.seats) return codeError('그런 방이 없어요');
-    if (room.seats.a === uid) return enterRoom(code, 'a');
-    if (room.seats.b === uid) return enterRoom(code, 'b');
-    if (room.seats.b) return codeError('이미 두 명이 들어와 있어요');
-    await DB.set(`${ROOT}/rooms/${code}/seats/b`, uid);
-    if (nickOf()) await DB.set(`${ROOT}/rooms/${code}/names/b`, nickOf());
-    enterRoom(code, 'b');
+    if (!room || !room.seats || !room.cfg) return codeError('그런 방이 없어요');
+    const mine = SEATS.find(k => room.seats[k] === uid);
+    if (mine) return enterRoom(code, mine);
+    if (room.cfg.st !== 'wait') return codeError('이미 게임을 하고 있는 방이에요');
+    const max = clamp(+room.cfg.max || 2, 2, 6);
+    for (const k of SEATS.slice(1, max)) {
+      if (room.seats[k]) continue;
+      try { await DB.set(`${ROOT}/rooms/${code}/seats/${k}`, uid); } catch (e) { continue; }   // 다른 친구가 먼저 앉으면 다음 자리
+      if (nickOf()) await DB.set(`${ROOT}/rooms/${code}/names/${k}`, nickOf()).catch(() => {});
+      return enterRoom(code, k);
+    }
+    codeError(`방이 꽉 찼어요 (${max}명)`);
   } catch (e) { console.warn(e); codeError('들어가지 못했어요. 다시 해 주세요.'); }
   finally { G.joining = false; }
 }
 function enterRoom(code, seat) {
   leaveRoom();
-  Object.assign(G, { mode: 'duo', code, seat, opp: seat === 'a' ? 'b' : 'a', room: null, key: null, oppGone: false });
+  Object.assign(G, { mode: 'duo', code, seat, room: null, key: null, oppGone: false, gone: {} });
   ls.set('dobble.last', { code, seat });
   DB.whileOnline(`${roomPath()}/on/${seat}`, true).catch(() => {});
   DB.remove(`${roomPath()}/quit/${seat}`).catch(() => {});
@@ -192,16 +205,20 @@ function leaveRoom() {
   roomTok++;
   if (G.unsub) { G.unsub(); G.unsub = null; }
   stopGame();
-  G.code = null; G.room = null; G.mode = null; G.oppGone = false;
+  G.code = null; G.room = null; G.mode = null; G.oppGone = false; G.gone = {};
 }
-/* 나가기: 기다리는 방이면 자리를 비우고, 게임 중이면 '나갔음'을 남김. 둘 다 나가면 방을 지움 */
+/* 아직 방에 남아 있는 다른 사람 (자리가 있고 나가지 않은) */
+function activeOthers(r) {
+  r = r || G.room || {};
+  return SEATS.filter(k => k !== G.seat && r.seats && r.seats[k] && !(r.quit && r.quit[k]));
+}
+/* 나가기: 기다리는 방이면 자리를 비우고(만든 사람이면 방을 닫음), 게임 중이면 '나갔음'을 남김. 남은 사람이 없으면 방을 지움 */
 function quitGame() {
   if (G.mode === 'duo' && G.code) {
     const r = G.room || {}, base = roomPath(), seat = G.seat;
-    const oppHere = r.seats && r.seats[G.opp] && !(r.quit && r.quit[G.opp]);
     let job;
-    if (!oppHere || G.oppGone) job = DB.remove(base);
-    else if (r.cfg && r.cfg.st === 'wait') job = seat === 'a' ? DB.remove(base) : DB.update(base, { 'names/b': null, 'seats/b': null, 'on/b': null });
+    if (!activeOthers(r).length || G.oppGone) job = DB.remove(base);
+    else if (r.cfg && r.cfg.st === 'wait') job = seat === 'a' ? DB.remove(base) : DB.update(base, { [`names/${seat}`]: null, [`seats/${seat}`]: null, [`on/${seat}`]: null });
     else job = DB.update(base, { [`quit/${seat}`]: true, [`on/${seat}`]: null });
     job.catch(e => console.warn(e));
   }
@@ -216,36 +233,53 @@ function onRoom(room) {
     leaveRoom(); ls.set('dobble.last', null); show('home'); renderResume(); return;
   }
   G.room = room; G.cfg = room.cfg;
-  if (room.quit && room.quit[G.opp]) {
-    if (!G.oppGone) {
-      G.oppGone = true; stopGame(); ls.set('dobble.last', null);
-      ask(`${seatName(G.opp)} 친구가 나갔어요`, '새 방을 만들어 다시 할 수 있어요', [{ label: '처음으로', main: true, fn: quitGame }]);
-    }
+  if (room.cfg.st === 'wait') { renderLobby(room); if ($('#lobby').hidden) show('lobby'); return; }
+  /* 게임 중에 나간 친구 */
+  const quit = room.quit || {};
+  const left = (G.players.length ? G.players : SEATS).filter(k => k !== G.seat && quit[k] && !G.gone[k]);
+  left.forEach(k => { G.gone[k] = true; toast(`${seatName(k)} 친구가 나갔어요`); });
+  if (!activeOthers(room).length && !G.oppGone) {
+    G.oppGone = true; stopGame(); ls.set('dobble.last', null);
+    const one = Object.keys(G.gone);
+    ask(one.length === 1 ? `${seatName(one[0])} 친구가 나갔어요` : '친구들이 모두 나갔어요', '새 방을 만들어 다시 할 수 있어요', [{ label: '처음으로', main: true, fn: quitGame }]);
     return;
   }
-  if (room.cfg.st === 'wait') { renderLobby(room); if ($('#lobby').hidden) show('lobby'); return; }
+  if (G.oppGone) return;
   const key = room.cfg.seed + '/' + room.cfg.go;
   if (key !== G.key) { G.key = key; setupGame(room.cfg, normClaims(room.claims)); }
   else gotClaims(normClaims(room.claims));
-  $('#oppName').textContent = seatName(G.opp);
+  renderOpps();
   $('#myName').textContent = seatName(G.seat);
-  $('#oppOff').hidden = !!(room.on && room.on[G.opp]);
 }
 function renderLobby(room) {
   const s = setById(room.cfg.set);
-  const total = symbolsFor(orderFor(s.symbols.length));
-  $('#lobbySet').textContent = `${s.name} · ${room.cfg.n && room.cfg.n < total ? room.cfg.n : total}장`;
-  $('#players').innerHTML = ['a', 'b'].map(k => {
+  const max = clamp(+room.cfg.max || 2, 2, 6), per = room.cfg.per == null ? 10 : +room.cfg.per;
+  const here = SEATS.filter(k => room.seats && room.seats[k]);
+  const n = deckLen(Math.max(2, here.length), per, setTotal(s));
+  const lname = (GAME.lengths.find(l => l.per === per) || {}).name || '';
+  $('#lobbySet').textContent = `${s.name} · ${lname} ${n}장 · ${max}명 방`;
+  $('#players').innerHTML = SEATS.slice(0, max).map(k => {
     const has = room.seats && room.seats[k];
-    if (!has) return `<div class="pl empty">친구를 기다리는 중…</div>`;
+    if (!has) return `<div class="pl empty">기다리는 중…</div>`;
     const on = room.on && room.on[k];
     return `<div class="pl${on ? '' : ' off'}" style="--c:${GAME.colors[k]}"><i class="dot"></i>${esc(seatName(k))}${k === G.seat ? ' <small>나</small>' : ''}</div>`;
   }).join('');
-  $('#startBtn').disabled = !(room.seats && room.seats.b);
+  $('#startBtn').disabled = here.length < 2;
+  $('#startBtn').textContent = here.length < 2 ? '시작!' : `시작! (${here.length}명)`;
+  $('#lobbyHint').textContent = here.length < 2 ? '친구가 한 명 이상 들어오면 시작할 수 있어요' : here.length < max ? `${max}명이 다 모이지 않아도 시작할 수 있어요` : '다 모였어요!';
+}
+/* 시작·다시 하기: 지금 방에 있는 사람(나가지 않은)을 참가자로 정하고 판 길이를 인원에 맞춤 */
+function startCfg(r) {
+  const players = SEATS.filter(k => r.seats && r.seats[k] && !(r.quit && r.quit[k]));
+  const per = r.cfg.per == null ? 10 : +r.cfg.per;
+  return { players: players.join(''), n: deckLen(players.length, per, setTotal(setById(r.cfg.set))), st: 'play', go: Math.round(DB.now() + (GAME.countdown + .6) * 1000) };
 }
 $('#startBtn').addEventListener('click', () => {
   fsAuto();
-  DB.update(`${roomPath()}/cfg`, { st: 'play', go: Math.round(DB.now() + (GAME.countdown + .6) * 1000) }).catch(() => toast('시작하지 못했어요'));
+  const r = G.room; if (!r) return;
+  const c = startCfg(r);
+  if (c.players.length < 2) return toast('친구가 한 명 이상 있어야 해요');
+  DB.update(`${roomPath()}/cfg`, c).catch(() => toast('시작하지 못했어요'));
 });
 $('#leave').addEventListener('click', quitGame);
 
@@ -259,7 +293,7 @@ renderResume();
 /* ================= 게임 준비 ================= */
 function normClaims(obj) {
   const a = []; if (!obj) return a;
-  for (let i = 0; ; i++) { const v = obj[i]; if (v !== 'a' && v !== 'b') break; a.push(v); }
+  for (let i = 0; ; i++) { const v = obj[i]; if (!SEATS.includes(v)) break; a.push(v); }
   return a;
 }
 const centerCard = () => G.game.deck[G.start + G.shown];
@@ -267,8 +301,8 @@ const remaining = () => G.game.deck.length - G.start - G.shown;
 
 function startSolo() {
   leaveRoom();
-  Object.assign(G, { mode: 'solo', seat: 'a', opp: null, room: null, code: null });
-  setupGame({ set: make.set, n: make.len, seed: newSeed(), go: Date.now() + (GAME.countdown + .6) * 1000 }, []);
+  Object.assign(G, { mode: 'solo', seat: 'a', room: null, code: null, gone: {} });
+  setupGame({ set: make.set, per: make.per, n: deckLen(1, make.per, setTotal(setById(make.set))), players: 'a', seed: newSeed(), go: Date.now() + (GAME.countdown + .6) * 1000 }, []);
 }
 function stopGame() {
   G.gen++; G.playing = false; G.busy = false; G.pending = null; G.locked = false;
@@ -289,19 +323,19 @@ function setupGame(cfg, claims) {
   G.cfg = cfg; G.set = setById(cfg.set);
   preloadSet(G.set);
   G.game = makeGame(G.set, cfg.seed, cfg.n || 0);
-  G.start = G.mode === 'solo' ? 1 : 2;
+  G.players = [...(cfg.players || (G.mode === 'solo' ? 'a' : 'ab'))].filter(k => SEATS.includes(k));
+  G.opps = G.players.filter(k => k !== G.seat);
+  G.watch = G.mode === 'duo' && !G.players.includes(G.seat);
+  G.start = G.players.length;
   G.claims = []; G.shown = 0; G.combo = 0; G.best = 0; G.ended = false;
-  G.tops = G.mode === 'solo' ? { a: G.game.deck[0] } : { a: G.game.deck[0], b: G.game.deck[1] };
-  G.scores = { a: 0, b: 0 };
+  G.tops = {}; G.scores = {};
+  G.players.forEach((k, i) => { G.tops[k] = G.game.deck[i]; G.scores[k] = 0; });
   const pl = $('#play');
-  pl.style.setProperty('--me', G.mode === 'solo' ? GAME.colors.a : GAME.colors[G.seat]);
-  pl.style.setProperty('--opp', G.mode === 'solo' ? GAME.colors.b : GAME.colors[G.opp]);
-  $('#oppBar').classList.toggle('solo', G.mode === 'solo');
+  pl.style.setProperty('--me', GAME.colors[G.seat] || GAME.colors.a);
   pl.classList.toggle('intact', !!G.set.intact);
-  $('#oppMini').hidden = G.mode === 'solo';
+  $('.slot.mine').classList.toggle('watch', G.watch);
+  buildOpps();
   $('#myName').textContent = G.mode === 'solo' ? (nickOf() || '나') : seatName(G.seat);
-  $('#oppName').textContent = G.mode === 'solo' ? '⏱ 0.0초' : seatName(G.opp);
-  $('#oppOff').hidden = true;
   show('play'); fit();
   /* 이미 진행된 판(다시 들어온 경우)은 바로 반영 */
   for (const w of claims) { G.claims.push(w); applyRound(w); }
@@ -327,7 +361,8 @@ async function countdown(go, gen) {
   cC.classList.remove('wait');
   renderCenter(true);
   G.playing = true; G.roundStart = performance.now(); G.t0 = performance.now();
-  if (G.mode === 'solo') G.clock = setInterval(() => { $('#oppName').textContent = '⏱ ' + ((performance.now() - G.t0) / 1000).toFixed(1) + '초'; }, 100);
+  if (G.mode === 'solo') G.clock = setInterval(() => { $('#soloTimer').textContent = '⏱ ' + ((performance.now() - G.t0) / 1000).toFixed(1) + '초'; }, 100);
+  if (G.watch) toast('이번 판은 구경해요. 다시 하기를 누르면 함께해요');
   sync();
 }
 
@@ -363,16 +398,42 @@ function renderCenter(anim) {
   if (anim) cC.animate([{ transform: 'scale(.5) rotate(-20deg)', opacity: 0 }, { transform: 'scale(1.08) rotate(3deg)', opacity: 1, offset: .7 }, { transform: 'scale(1) rotate(0)' }], { duration: 320, easing: 'ease-out' });
   $('#leftLbl').textContent = `가운데 카드 · 남은 ${Math.max(0, remaining())}장`;
 }
+/* 위쪽 상대 칸 (상대 1명이면 넓게, 여럿이면 나란히) */
+const oppEl = k => $(`#opps .pc[data-seat="${k}"]`);
+const miniOf = k => { const el = oppEl(k); return el ? el.querySelector('.mini') : $('#opps'); };
+/* 날아갈 곳: 작은 카드가 보이면 카드, 세로 화면에서 숨겨졌으면 이름 칸 */
+const anchorOf = k => { const m = miniOf(k); return m && m.getBoundingClientRect().width ? m : (oppEl(k) || $('#opps')); };
+function buildOpps() {
+  const box = $('#opps'), solo = G.mode === 'solo';
+  $('#soloTimer').hidden = !solo; $('#soloTimer').textContent = '⏱ 0.0초';
+  box.classList.toggle('many', G.opps.length > 1); box.classList.toggle('lots', G.opps.length > 3);
+  box.innerHTML = solo ? '' : G.opps.map(k => `<div class="pc" data-seat="${k}" style="--c:${GAME.colors[k]}">
+    <span class="who"><i class="dot"></i><b class="nm"></b><em class="off" hidden>나감</em></span>
+    <span class="count"><b class="sc">0</b><small>장</small></span><div class="mini card"></div></div>`).join('');
+  renderOpps();
+}
+function renderOpps() {
+  const best = Math.max(0, ...G.players.map(k => G.scores[k] || 0));
+  G.opps.forEach(k => {
+    const el = oppEl(k); if (!el) return;
+    el.querySelector('.nm').textContent = seatName(k);
+    const gone = !!G.gone[k], off = !gone && G.room && !(G.room.on && G.room.on[k]);
+    const em = el.querySelector('.off'); em.hidden = !(gone || off); em.textContent = gone ? '나감' : '연결 끊김';
+    el.classList.toggle('gone', gone);
+    el.classList.toggle('lead', best > 0 && G.scores[k] === best && G.opps.length > 1);
+  });
+}
 function renderAll() {
   renderCenter(false);
-  renderCard(cM, G.tops[G.seat]);
-  if (G.mode === 'duo') renderCard($('#oppMini'), G.tops[G.opp]);
+  if (G.watch) cM.innerHTML = ''; else renderCard(cM, G.tops[G.seat]);
+  G.opps.forEach(k => renderCard(miniOf(k), G.tops[k]));
   renderScores();
 }
 function renderScores() {
-  $('#myScore').textContent = G.scores[G.seat];
-  if (G.mode === 'duo') $('#oppScore').textContent = G.scores[G.opp];
-  const n = G.scores[G.seat];
+  $('#myScore').textContent = G.scores[G.seat] || 0;
+  G.opps.forEach(k => { const el = oppEl(k); if (el) el.querySelector('.sc').textContent = G.scores[k]; });
+  renderOpps();
+  const n = G.scores[G.seat] || 0;
   $('#pile').className = 'pile' + (n >= 3 ? ' n3' : n === 2 ? ' n2' : n === 1 ? ' n1' : '');
 }
 function comboLabel() {
@@ -382,7 +443,8 @@ function comboLabel() {
   if (G.combo >= 2) el.animate([{ transform: 'scale(.4)' }, { transform: 'scale(1.3)', offset: .5 }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
 }
 function setCombo(n) { G.combo = n; G.best = Math.max(G.best, n); comboLabel(); FX.setCombo(n); }
-function oppStreak() { let k = 0; for (let i = G.shown - 1; i >= 0 && G.claims[i] === G.opp; i--) k++; return G.mode === 'duo' ? k : 0; }
+/* 맨 마지막에 연속으로 가져간 상대의 연속 수 (위쪽 테두리 불) */
+function oppStreak() { const w = G.claims[G.shown - 1]; if (G.mode !== 'duo' || !w || w === G.seat) return 0; let k = 0; for (let i = G.shown - 1; i >= 0 && G.claims[i] === w; i--) k++; return k; }
 
 /* ================= 판 진행 ================= */
 function applyRound(w) {
@@ -416,14 +478,15 @@ async function oppTake(w) {
   const gen = G.gen;
   await oppShot(w, gen);
   if (gen !== G.gen) return;
-  const a = cC.getBoundingClientRect(), b = $('#oppMini').getBoundingClientRect();
+  const a = cC.getBoundingClientRect(), b = anchorOf(w).getBoundingClientRect();
   const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2), sc = b.width / a.width;
   FX.tone(500, .25, 'sine', .07, 160);
   await done(cC.animate([{ transform: 'none' }, { transform: `translate(${dx * .5}px,${dy * .5 - 30}px) rotate(-14deg) scale(${(1 + sc) / 2})`, offset: .5 }, { transform: `translate(${dx}px,${dy}px) rotate(-30deg) scale(${sc})`, opacity: .6 }], { duration: 340, easing: 'cubic-bezier(.5,0,.7,1)' }));
   if (gen !== G.gen) return;
   applyRound(w);
   renderAll(); renderCenter(true);
-  $('#oppMini').animate([{ transform: 'scale(1)' }, { transform: sqz(1.3, .8) }, { transform: sqz(.9, 1.12) }, { transform: 'scale(1)' }], { duration: 280 });
+  miniOf(w).animate([{ transform: 'scale(1)' }, { transform: sqz(1.3, .8) }, { transform: sqz(.9, 1.12) }, { transform: 'scale(1)' }], { duration: 280 });
+  const oe = oppEl(w); if (oe) oe.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 300 });
   FX.tone(150, .14, 'sine', .2, 70);
   FX.setOpp(oppStreak());
   G.roundStart = performance.now();
@@ -435,10 +498,11 @@ async function oppShot(w, gen) {
   const sid = commonOf(G.tops[w], centerCard());
   const tgt = cC.querySelector(`.sy[data-s="${sid}"]`);
   if (!tgt) return;
-  const from = $('#oppMini').querySelector(`.sy[data-s="${sid}"]`);
+  let from = miniOf(w).querySelector(`.sy[data-s="${sid}"]`);
+  if (from && !from.getBoundingClientRect().width) from = null;
   const m = matOf(G.set, sid), color = GAME.colors[w];
   const halo = `color-mix(in srgb, ${color} 30%, transparent)`;
-  const [tx, ty] = center(tgt), [sx, sy] = center(from || $('#oppMini'));
+  const [tx, ty] = center(tgt), [sx, sy] = center(from || anchorOf(w));
   const dx = tx - sx, dy = ty - sy;
   const tw = tgt.getBoundingClientRect().width || 1;
   const s0 = from ? Math.max(.12, from.getBoundingClientRect().width / tw) : .2;
@@ -486,7 +550,7 @@ const center = el => { const r = el.getBoundingClientRect(); return [r.left + r.
 cM.addEventListener('pointerdown', e => {
   const s = e.target.closest('.sy');
   if (!s || !G.playing || G.ended || G.busy || G.locked || G.pending || G.pressed) return;
-  if (!e.isPrimary || performance.now() < G.readyAt || !$('#ask').hidden) return;
+  if (G.watch || !e.isPrimary || performance.now() < G.readyAt || !$('#ask').hidden) return;
   e.preventDefault();
   G.pressed = s; G.pressId = e.pointerId;
   const sid = +s.dataset.s, m = matOf(G.set, sid);
@@ -672,22 +736,31 @@ function finish() {
       $('#rScore').innerHTML = `<div class="win" style="--c:${GAME.colors.a}">걸린 시간<b>${sec.toFixed(1)}초</b></div>`;
       $('#rSub').textContent = `최고 콤보 ${G.best}연속` + (prev && !rec ? ` · 내 최고 기록 ${prev.toFixed(1)}초` : '');
     } else {
-      const op = G.scores[G.opp];
-      $('#rTitle').textContent = me > op ? '이겼다! 🎉' : me < op ? '아깝다! 다시 한 번?' : '비겼다!';
-      $('#rScore').innerHTML = [G.seat, G.opp].map(k => `<div class="${G.scores[k] >= Math.max(me, op) ? 'win' : ''}" style="--c:${GAME.colors[k]}">${esc(seatName(k))}${k === G.seat ? ' (나)' : ''}<b>${G.scores[k]}장</b></div>`).join('');
-      $('#rSub').textContent = `내 최고 콤보 ${G.best}연속`;
+      /* 순위: 같은 장수면 같은 등수 */
+      const order = G.players.slice().sort((x, y) => G.scores[y] - G.scores[x]);
+      const rank = k => 1 + G.players.filter(o => G.scores[o] > G.scores[k]).length;
+      const top = G.scores[order[0]], tied = G.players.filter(k => G.scores[k] === top).length;
+      const myRank = G.watch ? 0 : rank(G.seat);
+      if (G.players.length === 2) $('#rTitle').textContent = G.watch ? '게임 끝!' : myRank === 1 ? (tied > 1 ? '비겼다!' : '이겼다! 🎉') : '아깝다! 다시 한 번?';
+      else $('#rTitle').textContent = G.watch ? '게임 끝!' : myRank === 1 ? (tied > 1 ? '공동 1등! 🎉' : '1등! 🎉') : `${myRank}등! 다시 한 번?`;
+      $('#rScore').classList.toggle('many', G.players.length > 3);
+      $('#rScore').innerHTML = order.map(k => `<div class="${G.scores[k] === top ? 'win' : ''}" style="--c:${GAME.colors[k]}"><span class="rk">${G.players.length > 2 ? rank(k) + '등' : ''}${G.gone[k] ? ' · 나감' : ''}</span>${esc(seatName(k))}${k === G.seat ? ' (나)' : ''}<b>${G.scores[k]}장</b></div>`).join('');
+      $('#rSub').textContent = G.watch ? '' : `내 최고 콤보 ${G.best}연속`;
     }
     $('#result').hidden = false;
     FX.setCombo(0); FX.setOpp(0);
-    if (me >= (G.mode === 'solo' ? 0 : G.scores[G.opp])) { const w = innerWidth; for (let i = 0; i < 4; i++) setTimeout(() => FX.burst(rnd(w * .2, w * .8), rnd(80, 260), 22, 140), i * 160); }
+    if (G.mode === 'solo' || (!G.watch && me >= Math.max(...G.players.map(k => G.scores[k])))) { const w = innerWidth; for (let i = 0; i < 4; i++) setTimeout(() => FX.burst(rnd(w * .2, w * .8), rnd(80, 260), 22, 140), i * 160); }
   }, 600);
 }
 $('#again').addEventListener('click', () => {
   fsAuto();
-  if (G.mode === 'solo') { make.set = G.cfg.set; make.len = G.cfg.n; startSolo(); return; }
+  if (G.mode === 'solo') { make.set = G.cfg.set; if (G.cfg.per != null) make.per = G.cfg.per; startSolo(); return; }
   if (G.cfg && G.cfg.go > DB.now()) return;
+  const r = G.room; if (!r) return;
+  const c = startCfg(r);
+  if (c.players.length < 2) return toast('함께할 친구가 없어요');
   DB.remove(`${roomPath()}/claims`)
-    .then(() => DB.update(`${roomPath()}/cfg`, { seed: newSeed(), st: 'play', go: Math.round(DB.now() + (GAME.countdown + .6) * 1000) }))
+    .then(() => DB.update(`${roomPath()}/cfg`, Object.assign(c, { seed: newSeed() })))
     .catch(() => toast('다시 시작하지 못했어요'));
 });
 $('#toHome').addEventListener('click', quitGame);

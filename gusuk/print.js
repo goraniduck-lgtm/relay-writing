@@ -39,14 +39,16 @@ function poster() {
   let s = `<g class="poster">`;
   /* 머리 */
   s += `<rect x="0" y="0" width="${PW}" height="${PH}" fill="#fff"/>`;
-  s += `<rect x="0" y="0" width="${PW}" height="54" fill="#F5EFE3"/><rect x="0" y="54" width="${PW}" height="1.2" fill="#1F6F78"/>`;
-  s += `<g transform="translate(14,10) scale(0.85)"><circle cx="20" cy="20" r="18" fill="#1F6F78"/><path d="M20 6l5 14-5 14-5-14z" fill="#fff"/><path d="M20 6l5 14h-10z" fill="#F2C12E"/></g>`;
-  s += T(52, 31, 19, '구석구석 다 함께 찾아요', ' font-weight="900" fill="#2B2A26"');
-  s += T(53, 45, 6, `우리 반이 함께 찾은 지역을 알리기 위한 노력 · 사회 4-2 · ${today}`, ' fill="#6B6558" font-weight="600"');
+  s += `<rect x="0" y="0" width="${PW}" height="50" fill="#F5EFE3"/><rect x="0" y="50" width="${PW}" height="1.2" fill="#1F6F78"/>`;
+  s += `<g transform="translate(14,8) scale(0.85)"><circle cx="20" cy="20" r="18" fill="#1F6F78"/><path d="M20 6l5 14-5 14-5-14z" fill="#fff"/><path d="M20 6l5 14h-10z" fill="#F2C12E"/></g>`;
+  s += T(52, 29, 19, '구석구석 다 함께 찾아요', ' font-weight="900" fill="#2B2A26"');
+  s += T(53, 42, 6, `우리 반이 함께 찾은 지역을 알리기 위한 노력 · 사회 4-2 · ${today}`, ' fill="#6B6558" font-weight="600"');
   const kp = [[`${list.length}`, '찾은 카드'], [`${regions}`, '찾은 지자체'], [`${sidoN}/${SIDO.length}`, '채운 시·도']];
-  kp.forEach(([v, l], i) => { const x = 300 + i * 39; s += `<rect x="${x}" y="11" width="35" height="33" rx="3" fill="#fff" stroke="#E1D7C3" stroke-width=".5"/>` + T(x + 17.5, 30, 11, v, ' text-anchor="middle" font-weight="900" fill="#1F6F78"') + T(x + 17.5, 39.5, 4.2, l, ' text-anchor="middle" fill="#6B6558" font-weight="700"'); });
-  /* 지도 */
-  const mx = 10, my = 62, mw = 262, sc = mw / FULL.w, mh = FULL.h * sc;
+  kp.forEach(([v, l], i) => { const x = 300 + i * 39; s += `<rect x="${x}" y="9" width="35" height="32" rx="3" fill="#fff" stroke="#E1D7C3" stroke-width=".5"/>` + T(x + 17.5, 27.5, 11, v, ' text-anchor="middle" font-weight="900" fill="#1F6F78"') + T(x + 17.5, 37, 4.2, l, ' text-anchor="middle" fill="#6B6558" font-weight="700"'); });
+  /* 배치: 목록(시·도별로 묶어 촘촘하게)이 다 들어가는 범위에서 지도를 가장 크게 */
+  const groups = SIDO.map(sd => ({ sd, keys: order.filter(k => REG[k].s === sd.s) })).filter(g => g.keys.length);
+  const lay = layout(groups, list, info, num);
+  const mx = PL, my = PT, mw = lay.mw, sc = mw / FULL.w, mh = FULL.h * sc;
   const u = 1 / sc;   // 1mm 의 지도 길이
   s += `<rect x="${mx}" y="${my}" width="${mw}" height="${mh.toFixed(1)}" rx="3" fill="#E7F1F5"/>`;
   s += `<g transform="translate(${mx},${my}) scale(${sc.toFixed(5)}) translate(${-FULL.x},${-FULL.y})">`;
@@ -80,82 +82,129 @@ function poster() {
   GNUMS.forEach((g, i) => { const y = ly0 + 8 + i * 6.2; s += `<rect x="${mx + 8}" y="${y}" width="7" height="4.6" rx="1" fill="url(#pppg${g})"/>` + T(mx + 17, y + 3.7, 3.5, `${g}모둠`, ' font-weight="700" fill="#2B2A26"'); });
   const ly1 = ly0 + 8 + 6 * 6.2 + 2;
   s += `<circle cx="${mx + 9.5}" cy="${ly1 + 1}" r="1.1" fill="#1D7FE0"/>` + T(mx + 13, ly1 + 2.2, 3, '함께 찾은 모둠', ' fill="#6B6558"');
-  s += T(mx + 8, ly1 + 8, 3, '⭐ 우리 지역 · 번호 = 오른쪽 목록', ' fill="#6B6558"');
+  s += T(mx + 8, ly1 + 8, 3, '⭐ 우리 지역 · 번호 = 목록 번호', ' fill="#6B6558"');
   s += T(mx + 8, ly1 + 13, 3, '왼쪽 반: 먼저 찾은 모둠', ' fill="#6B6558"') + T(mx + 8, ly1 + 17.5, 3, '오른쪽 반: 가장 많이 찾은 모둠', ' fill="#6B6558"');
   /* 통계 띠 */
-  const sy = my + mh + 8;
-  s += statsBand(list, mx, sy, mw, 78);
+  s += statsBand(list, mx, my + mh + GAP, mw, STATS_H);
   /* 목록 */
-  s += listCols(list, order, num, info, { right: { x: 280, y0: my, y1: PH - 10, w: 130 }, bottom: { y0: sy + 84, y1: PH - 10 } });
+  s += lay.svg;
   s += T(PW / 2, PH - 3.5, 2.8, '자료: 학생 조사(대한민국 구석구석·지역 문화 관광 누리집 등) · 지도: 통계청 행정구역 경계(2026년 10월 기준)를 단순하게 그림', ' text-anchor="middle" fill="#8b8576"');
   s += `</g>`;
   return { svg: s, n: list.length };
 }
 function statsBand(list, x, y, w, h) {
   let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#FBF8F1" stroke="#E1D7C3" stroke-width=".4"/>`;
-  s += T(x + 5, y + 8, 4.6, '모둠별로 찾은 카드', ' font-weight="800" fill="#2B2A26"');
+  s += T(x + 4, y + 6.5, 4, '모둠별로 찾은 카드', ' font-weight="800" fill="#2B2A26"');
   const byG = {}; list.forEach(c => { (byG[c.g] = byG[c.g] || {})[c.c] = ((byG[c.g] || {})[c.c] || 0) + 1; });
   const tot = g => Object.values(byG[g] || {}).reduce((a, b) => a + b, 0);
   const mxv = Math.max(1, ...GNUMS.map(tot));
-  const bw = w * 0.55 - 28;
+  const bw = w * 0.58 - 30, rh = (h - 11) / 6, bh = Math.min(5, rh * 0.78);
   GNUMS.forEach((g, i) => {
-    const yy = y + 13 + i * 9.6;
-    s += `<rect x="${x + 5}" y="${yy}" width="6" height="6" rx="1.2" fill="${GROUPS[g].c}"/>` + T(x + 8, yy + 4.6, 3.6, g, ` text-anchor="middle" font-weight="900" fill="${GROUPS[g].ink}"`);
-    s += T(x + 13, yy + 4.6, 3.6, `${g}모둠`, ' font-weight="700" fill="#2B2A26"');
-    let cx = x + 27;
-    CAT_KEYS.forEach(c => { const n = (byG[g] || {})[c] || 0; if (!n) return; const ww = n / mxv * bw; s += `<rect x="${cx.toFixed(2)}" y="${yy}" width="${Math.max(.5, ww - .5).toFixed(2)}" height="6" rx="1" fill="${CATS[c].c}"/>`; cx += ww; });
-    s += T(cx + 2, yy + 4.6, 3.6, tot(g), ' font-weight="800" fill="#2B2A26"');
+    const yy = y + 9.5 + i * rh;
+    s += `<rect x="${x + 4}" y="${yy}" width="${bh}" height="${bh}" rx="1" fill="${GROUPS[g].c}"/>` + T(x + 4 + bh / 2, yy + bh * .78, bh * .75, g, ` text-anchor="middle" font-weight="900" fill="${GROUPS[g].ink}"`);
+    s += T(x + 6 + bh, yy + bh * .78, 3.3, `${g}모둠`, ' font-weight="700" fill="#2B2A26"');
+    let cx = x + 24;
+    CAT_KEYS.forEach(c => { const n = (byG[g] || {})[c] || 0; if (!n) return; const ww = n / mxv * bw; s += `<rect x="${cx.toFixed(2)}" y="${yy}" width="${Math.max(.5, ww - .5).toFixed(2)}" height="${bh}" rx="1" fill="${CATS[c].c}"/>`; cx += ww; });
+    s += T(cx + 1.5, yy + bh * .78, 3.3, tot(g), ' font-weight="800" fill="#2B2A26"');
   });
-  /* 분류별 */
-  const cx0 = x + w * 0.58, cwid = (w * 0.42 - 6) / 2;
-  s += T(cx0, y + 8, 4.6, '무엇을 찾았나요?', ' font-weight="800" fill="#2B2A26"');
+  const cx0 = x + w * 0.6, cwid = (w * 0.4 - 6) / 2, th = (h - 13) / 2;
+  s += T(cx0, y + 6.5, 4, '무엇을 찾았나요?', ' font-weight="800" fill="#2B2A26"');
   CAT_KEYS.forEach((c, i) => {
     const n = list.filter(k => k.c === c).length;
-    const bx = cx0 + (i % 2) * (cwid + 3), by = y + 13 + Math.floor(i / 2) * 31;
-    s += `<rect x="${bx}" y="${by}" width="${cwid}" height="27" rx="2.5" fill="#fff" stroke="${CATS[c].c}" stroke-width=".5"/>`;
-    s += T(bx + cwid / 2, by + 9, 5.5, CATS[c].icon, ' text-anchor="middle"') + T(bx + cwid / 2, by + 19.5, 9, n, ` text-anchor="middle" font-weight="900" fill="${CATS[c].c}"`) + T(bx + cwid / 2, by + 24.6, 3.4, CATS[c].name, ' text-anchor="middle" font-weight="700" fill="#2B2A26"');
+    const bx = cx0 + (i % 2) * (cwid + 3), by = y + 9.5 + Math.floor(i / 2) * (th + 2);
+    s += `<rect x="${bx}" y="${by}" width="${cwid}" height="${th}" rx="2.5" fill="#fff" stroke="${CATS[c].c}" stroke-width=".5"/>`;
+    s += T(bx + 4, by + th / 2 + 1.8, 5, CATS[c].icon) + T(bx + cwid / 2 + 3, by + th / 2 + 2.6, 8, n, ` text-anchor="middle" font-weight="900" fill="${CATS[c].c}"`) + T(bx + cwid - 3, by + th / 2 + 1.2, 3.2, CATS[c].name, ' text-anchor="end" font-weight="700" fill="#2B2A26"');
   });
   return s;
 }
-/* 목록: 오른쪽 칸을 먼저 채우고 넘치면 통계 아래 두 칸으로 */
-function listCols(list, order, num, info, area) {
-  if (!list.length) return T(area.right.x, area.right.y0 + 10, 5, '아직 찾은 카드가 없어요.', ' fill="#6B6558"');
-  const cols = [Object.assign({}, area.right), { x: 10, y0: area.bottom.y0, y1: area.bottom.y1, w: 126 }, { x: 146, y0: area.bottom.y0, y1: area.bottom.y1, w: 126 }];
-  const cap = cols.reduce((a, c) => a + (c.y1 - c.y0), 0);
-  const items = [];
-  order.forEach(k => { items.push({ head: k }); list.filter(c => c.r === k).forEach(c => items.push({ c })); });
-  const nh = order.length, nc = list.length;
-  let mode = 2, f = 1;
-  const need = (m, ff) => (nh * 7 + nc * (m === 2 ? 9.6 : 5.4)) * ff + cols.length * 3;
-  if (need(2, 1) > cap) mode = 1;
-  if (need(mode, 1) > cap) f = Math.max(0.55, cap / need(mode, 1));
-  let ci = 0, y = cols[0].y0 + 4;
-  let s = `<rect x="${cols[0].x - 2}" y="${cols[0].y0}" width="${cols[0].w + 4}" height="${cols[0].y1 - cols[0].y0}" rx="3" fill="#FBF8F1" stroke="#E1D7C3" stroke-width=".4"/>`;
-  let overflowBox = false;
-  for (const it of items) {
-    const h = (it.head ? 7 : mode === 2 ? 9.6 : 5.4) * f;
-    let col = cols[ci];
-    if (y + h > col.y1 - 1) {
-      ci++; if (ci >= cols.length) { s += T(col.x, col.y1 - 1, 3 * f, '… 카드가 많아 일부만 실었어요', ' fill="#B42318"'); break; }
-      col = cols[ci]; y = col.y0 + 4;
-      if (!overflowBox) { s += `<rect x="8" y="${col.y0}" width="266" height="${col.y1 - col.y0}" rx="3" fill="#FBF8F1" stroke="#E1D7C3" stroke-width=".4"/>`; overflowBox = true; }
+/* ---------- 목록 (시·도별 묶음, 지역마다 카드를 한 줄에 이어 씀) ---------- */
+const PL = 8, PR = PW - 8, PT = 56, PB = PH - 9, GAP = 5, STATS_H = 44, COLGAP = 6;
+function layout(groups, list, info, num) {
+  const asp = FULL.w / FULL.h;
+  const tryIt = (mw, f) => {
+    const mh = mw / asp, cols = [];
+    const rx = PL + mw + COLGAP;
+    if (PR - rx >= 60) cols.push({ x: rx, y0: PT, y1: PB, w: PR - rx });
+    const by0 = PT + mh + GAP + STATS_H + GAP;
+    if (PB - by0 >= 12) {
+      const n = Math.max(1, Math.floor((mw + COLGAP) / (86 + COLGAP))), cw = (mw - (n - 1) * COLGAP) / n;
+      for (let i = 0; i < n; i++) cols.push({ x: PL + i * (cw + COLGAP), y0: by0, y1: PB, w: cw, bottom: true });
     }
-    if (it.head) {
-      const k = it.head, G = GROUPS[info[k].first], fs = 3.9 * f;
-      s += `<circle cx="${col.x + 2.6 * f}" cy="${y + 3.2 * f}" r="${2.5 * f}" fill="${G.c}"/>` + halfDisc(col.x + 2.6 * f, y + 3.2 * f, 2.5 * f, info[k]) + T(col.x + 2.6 * f, y + 4.25 * f, (num[k] > 99 ? 2.2 : 2.9) * f, num[k], ` text-anchor="middle" font-weight="900" fill="${G.ink}" stroke="${G.c}" stroke-width="${.5 * f}" paint-order="stroke"`);
-      s += T(col.x + 6.5 * f, y + 4.5 * f, fs, fit(REG[k].label, fs, col.w - 30), ' font-weight="900" fill="#2B2A26"') + T(col.x + 7 * f + tw(fit(REG[k].label, fs, col.w - 30), fs), y + 4.5 * f, 2.8 * f, REG[k].whole ? '' : REG[k].sido.sh, ' fill="#8b8576"');
-    } else {
-      const c = it.c, C = CATS[c.c], G = GROUPS[c.g] || GROUPS[0], fs = 3.4 * f, x0 = col.x + 6.5 * f;
-      const tag = C.name, tagW = tw(tag, 2.8 * f) + 2.4 * f;
-      s += `<rect x="${x0}" y="${y + .9 * f}" width="${tagW}" height="${3.9 * f}" rx="${.8 * f}" fill="${C.c}"/>` + T(x0 + tagW / 2, y + 3.85 * f, 2.8 * f, tag, ' text-anchor="middle" font-weight="800" fill="#fff"');
-      const nx = x0 + tagW + 1.4 * f, gW = 9 * f;
-      s += T(nx, y + 4 * f, fs, fit(c.n, fs, col.w - (nx - col.x) - gW - 1), ' font-weight="800" fill="#2B2A26"');
-      s += `<rect x="${col.x + col.w - gW + 1}" y="${y + .9 * f}" width="${gW - 1}" height="${3.9 * f}" rx="${.8 * f}" fill="${G.c}"/>` + T(col.x + col.w - gW / 2 + .5, y + 3.85 * f, 2.6 * f, c.g ? `${c.g}모둠` : '선생님', ` text-anchor="middle" font-weight="800" fill="${G.ink}"`);
-      if (mode === 2) s += T(x0, y + 8.3 * f, 2.9 * f, fit(c.w, 2.9 * f, col.w - 7 * f), ' fill="#5b564b"');
+    if (!cols.length || by0 > PB + 1) return null;
+    const r = flow(groups, list, info, num, cols, f);
+    return r.ok ? Object.assign(r, { mw }) : null;
+  };
+  for (let mw = 334; mw >= 210; mw -= 2) { const r = tryIt(mw, 1); if (r) return r; }
+  for (let f = 0.95; f >= 0.5; f -= 0.05) for (let mw = 300; mw >= 210; mw -= 6) { const r = tryIt(mw, f); if (r) return r; }
+  return Object.assign(flow(groups, list, info, num, [{ x: PL + 216, y0: PT, y1: PB, w: PR - PL - 216 }], 0.5, true), { mw: 210 });
+}
+function flow(groups, list, info, num, cols, f, force) {
+  const lh = 5 * f, hh = 6.6 * f, fsN = 3.15 * f, fsT = 2.3 * f, ind = 5.2 * f, chipW = 4 * f, gap = 2.4 * f;
+  const byR = {}; list.forEach(c => { (byR[c.r] = byR[c.r] || []).push(c); });
+  let ci = 0, y = cols[0].y0 + 1.5 * f, s = '', used = new Set([0]), ok = true;
+  const col = () => cols[ci];
+  const next = () => { ci++; if (ci >= cols.length) { ok = false; return false; } used.add(ci); y = col().y0 + 1.5 * f; return true; };
+  const head = (sd, n, cont) => {
+    const c = col();
+    s += T(c.x + 1, y + 4.6 * f, 3.9 * f, sd.sn + (cont ? ' (이어서)' : ''), ' font-weight="900" fill="#1F4F56"') +
+      T(c.x + c.w - 1, y + 4.6 * f, 2.8 * f, cont ? '' : `${n}곳`, ' text-anchor="end" fill="#8b8576" font-weight="700"') +
+      `<rect x="${c.x}" y="${(y + hh - 1.1 * f).toFixed(2)}" width="${c.w}" height="${(.45 * f).toFixed(2)}" fill="#1F6F78" fill-opacity=".5"/>`;
+    y += hh + .6 * f;
+  };
+  /* 지역 하나를 줄 단위로 배치해 보고 [줄 수, 그리기] 돌려줌 */
+  const block = (k, c) => {
+    const items = [], G = GROUPS[info[k].first], name = REG[k].whole ? REG[k].label : (REG[k].sido.s === '12' && REG[k].label.startsWith('광주') ? REG[k].label : REG[k].n);
+    let line = 0, x = c.x;
+    const nameW = tw(name, 3.35 * f);
+    items.push(o => `<circle cx="${(c.x + 2.2 * f).toFixed(2)}" cy="${(o + 2.9 * f).toFixed(2)}" r="${(2.15 * f).toFixed(2)}" fill="${G.c}"/>` + halfDisc(c.x + 2.2 * f, o + 2.9 * f, 2.15 * f, info[k]) +
+      T(c.x + 2.2 * f, o + 3.95 * f, (num[k] > 99 ? 1.95 : 2.55) * f, num[k], ` text-anchor="middle" font-weight="900" fill="${G.ink}" stroke="${G.c}" stroke-width="${(.45 * f).toFixed(2)}" paint-order="stroke"`) +
+      T(c.x + ind, o + 4 * f, 3.35 * f, name, ' font-weight="900" fill="#2B2A26"'));
+    x = c.x + ind + nameW + gap * 1.4;
+    (byR[k] || []).forEach(card => {
+      const C = CATS[card.c], CG = GROUPS[card.g] || GROUPS[0];
+      const tagW = tw(C.name, fsT) + 1.6 * f;
+      let nm = card.n, w = tagW + .9 * f + tw(nm, fsN) + .9 * f + chipW;
+      const maxW = c.w - ind;
+      if (w > maxW) { nm = fit(nm, fsN, maxW - tagW - chipW - 2 * f); w = tagW + .9 * f + tw(nm, fsN) + .9 * f + chipW; }
+      if (x + w > c.x + c.w) { line++; x = c.x + ind; }
+      const L = line, X = x;
+      items.push(o => {
+        const yy = o + L * lh;
+        return `<rect x="${X.toFixed(2)}" y="${(yy + 1.05 * f).toFixed(2)}" width="${tagW.toFixed(2)}" height="${(3.5 * f).toFixed(2)}" rx="${(.7 * f).toFixed(2)}" fill="${C.c}"/>` +
+          T(X + tagW / 2, yy + 3.6 * f, fsT, C.name, ' text-anchor="middle" font-weight="800" fill="#fff"') +
+          T(X + tagW + .9 * f, yy + 4 * f, fsN, nm, ' font-weight="700" fill="#2B2A26"') +
+          `<rect x="${(X + w - chipW).toFixed(2)}" y="${(yy + 1.05 * f).toFixed(2)}" width="${chipW.toFixed(2)}" height="${(3.5 * f).toFixed(2)}" rx="${(.7 * f).toFixed(2)}" fill="${CG.c}"/>` +
+          T(X + w - chipW / 2, yy + 3.65 * f, 2.6 * f, card.g || '선', ` text-anchor="middle" font-weight="900" fill="${CG.ink}"`);
+      });
+      x += w + gap;
+    });
+    return { lines: line + 1, draw: o => items.map(fn => fn(o)).join('') };
+  };
+  for (const g of groups) {
+    if (y + hh + lh > col().y1 && !next()) break;
+    head(g.sd, g.keys.length, false);
+    for (const k of g.keys) {
+      let b = block(k, col());
+      if (y + b.lines * lh > col().y1) {
+        if (!next()) break;
+        head(g.sd, 0, true);
+        b = block(k, col());
+      }
+      s += b.draw(y);
+      y += b.lines * lh + .5 * f;
     }
-    y += h;
+    if (!ok) break;
+    y += 1.8 * f;
   }
-  return s;
+  if (!ok && !force) return { ok: false };
+  /* 칸 바탕 */
+  let bg = '';
+  const usedCols = cols.filter((c, i) => used.has(i));
+  const side = usedCols.filter(c => !c.bottom), bottom = usedCols.filter(c => c.bottom);
+  side.forEach(c => { bg += `<rect x="${c.x - 2}" y="${c.y0 - 1}" width="${c.w + 4}" height="${c.y1 - c.y0 + 2}" rx="3" fill="#FBF8F1" stroke="#E1D7C3" stroke-width=".4"/>`; });
+  if (bottom.length) { const a = cols.filter(c => c.bottom); bg += `<rect x="${a[0].x - 2}" y="${a[0].y0 - 1}" width="${a[a.length - 1].x + a[a.length - 1].w - a[0].x + 4}" height="${a[0].y1 - a[0].y0 + 2}" rx="3" fill="#FBF8F1" stroke="#E1D7C3" stroke-width=".4"/>`; }
+  if (!list.length) return { ok: true, svg: T(cols[0].x + 2, cols[0].y0 + 8, 5, '아직 찾은 카드가 없어요.', ' fill="#6B6558"') };
+  return { ok: true, svg: bg + s + (ok ? '' : T(cols[cols.length - 1].x, PB, 3, '… 카드가 많아 일부만 실었어요', ' fill="#B42318"')) };
 }
 
 /* 오른쪽 반원: 가장 많이 등록한 모둠 */

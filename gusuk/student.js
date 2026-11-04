@@ -169,7 +169,7 @@ function regionSec(k) {
   const isHome = k === (S.cfg.home || '41590');
   const last = S.lastSrc[k];
   return `<div class="sec"><div class="rhead"><div class="t"><h2>${isHome ? '⭐ ' : ''}${esc(r.label)}</h2><small>${esc(r.full)}${isHome ? ' · 우리 지역' : ''}</small></div><button class="btn small" id="back">← ${r.whole ? '전국' : esc(r.sido.sh)}</button></div>
-    ${x ? `<div class="muted">처음 찾은 모둠: ${groupDot(x.first)} · 가장 많이 찾은 모둠: ${groupDot(x.most)} ${x.cnt[x.most]}장${restGroups(x).length ? ` · 함께 찾은 모둠: ${restGroups(x).map(groupDot).join(' ')}` : ''}</div>${x.most !== x.first ? '' : x.groups.length > 1 ? `<div class="muted" style="font-size:13px">다른 모둠이 ${GROUPS[x.first].name}보다 카드를 더 많이 올리면 지도의 오른쪽 절반을 차지해요</div>` : ''}` : `<div class="muted">아직 아무도 찾지 않았어요. 우리가 처음 찾아볼까요?</div>`}
+    ${x ? `<div class="muted">처음 찾은 모둠: ${groupDot(x.first)} · 가장 많이 찾은 모둠: ${groupDot(x.most)} ${x.cnt[x.most]}장${restGroups(x).length ? ` · 함께 찾은 모둠: ${restGroups(x).map(groupDot).join(' ')}` : ''}</div>${x.most !== x.first ? '' : x.groups.length > 1 ? `<div class="muted" style="font-size:13px">다른 모둠이 ${GROUPS[x.first].name}만큼 카드를 올리면 지도의 오른쪽 절반을 차지해요</div>` : ''}` : `<div class="muted">아직 아무도 찾지 않았어요. 우리가 처음 찾아볼까요?</div>`}
     <button class="btn primary big" id="write" ${S.cfg.lock ? 'disabled' : ''}>＋ 이 지역 카드 쓰기</button></div>
     <div class="sec"><h3>🔎 자료 찾기</h3><div class="links">
       <a class="lnk gs" data-src="gs" href="${LINKS.gs(k)}" target="_blank" rel="noopener"><span class="ic">🧭</span><span>대한민국 구석구석에서 찾기<small>한국관광공사 · '${esc(searchWord(k))}' 검색${last === 'gs' ? ' · 최근에 열어 봄' : ''}</small></span></a>

@@ -171,7 +171,8 @@ function visibleCards(cards, cfg) {
     .sort((a, b) => (a.ts || 0) - (b.ts || 0));
 }
 /* 지역마다 처음 등록한 모둠(first), 가장 많이 등록한 모둠(most), 참여한 모둠들(등록 순), 모둠별 장수(cnt)
-   가장 많이 등록한 모둠이 여럿이면 먼저 등록한 모둠 → 처음 등록한 모둠이 그중에 있으면 first === most (한 색) */
+   가장 많이 등록한 모둠이 여럿(같은 수)이면 처음 모둠이 아닌 쪽 중 먼저 등록한 모둠 → 1:1 이어도 반씩 칠함
+   처음 등록한 모둠이 혼자 가장 많을 때만 한 색 */
 function paintInfo(list) {
   const info = {};
   for (const c of list) {
@@ -180,7 +181,11 @@ function paintInfo(list) {
     p.cnt[c.g] = (p.cnt[c.g] || 0) + 1;
     p.n++;
   }
-  for (const p of Object.values(info)) p.most = p.groups.reduce((a, b) => (p.cnt[b] > p.cnt[a] ? b : a), p.groups[0]);
+  for (const p of Object.values(info)) {
+    const max = Math.max(...Object.values(p.cnt));
+    p.most = p.groups.find(g => g !== p.first && p.cnt[g] === max);
+    if (p.most == null) p.most = p.first;
+  }
   return info;
 }
 /* 반씩 칠한 두 모둠을 뺀 나머지 모둠 (점으로 표시) */

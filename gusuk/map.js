@@ -38,6 +38,7 @@ class GMap {
       <rect class="sea" x="-500" y="-500" width="2000" height="2200"/>
       <g class="ull"><rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" rx="4"/><text x="${b[0] + 3}" y="${b[3] - 3}">울릉도·독도</text></g>
       <g class="regions">${regs}</g>
+      <g class="halves"></g>
       <g class="sidos">${sidos}</g>
       <g class="dots"></g>
       <g class="selg"></g>
@@ -166,6 +167,15 @@ class GMap {
       el.style.fill = x ? `url(#${p}pg${x.first})` : '';
       el.classList.toggle('painted', !!x);
     }
+    /* 가장 많이 등록한 모둠이 처음 모둠과 다르면 오른쪽 절반을 그 모둠 색으로 */
+    let h = '';
+    for (const r of REGIONS) {
+      const x = this.info[r.k]; if (!x || x.most === x.first) continue;
+      const mid = ((r.b[0] + r.b[2]) / 2).toFixed(1), y0 = (r.b[1] - 2).toFixed(1), y1 = (r.b[3] + 2).toFixed(1);
+      h += `<g class="half" data-k="${r.k}"><clipPath id="${p}hc${r.k}"><rect x="${mid}" y="${y0}" width="${(r.b[2] - mid + 2).toFixed(1)}" height="${(y1 - y0).toFixed(1)}"/></clipPath><clipPath id="${p}hr${r.k}"><path d="${r.d}"/></clipPath>` +
+        `<path d="${r.d}" fill="url(#${p}pg${x.most})" clip-path="url(#${p}hc${r.k})"/><line x1="${mid}" y1="${y0}" x2="${mid}" y2="${y1}" clip-path="url(#${p}hr${r.k})"/></g>`;
+    }
+    this.svg.querySelector('.halves').innerHTML = h;
     this.drawDots(); this.drawLabels(); this.applyFocus();
   }
   setFocusGroup(g) { this.focusGroup = g; this.applyFocus(); }
@@ -175,6 +185,7 @@ class GMap {
       const x = this.info[k];
       el.classList.toggle('dim', g != null && !(x && x.groups.includes(g)));
     }
+    this.svg.querySelectorAll('.half').forEach(el => { const x = this.info[el.dataset.k]; el.classList.toggle('dim', g != null && !(x && x.groups.includes(g))); });
     this.drawDots();
   }
   /* 시·도별 진하기 (통계용) */
@@ -186,7 +197,7 @@ class GMap {
       el.style.fillOpacity = v ? (0.18 + 0.82 * v / max).toFixed(2) : '';
     }
   }
-  /* 두 번째 모둠부터는 점으로 */
+  /* 반씩 칠한 두 모둠 말고 다른 모둠은 점으로 */
   drawDots() {
     const g = this.svg.querySelector('.dots'); if (!g) return;
     const u = this.unit || 1, r = Math.max(2.2, 5.5 * u), lvl = this.zoomLevel();
@@ -198,7 +209,7 @@ class GMap {
         h += `<g class="whole" data-k="${k}"><rect x="${lx + 14 * u}" y="${ly - 12 * u}" width="${(12 + 11 * x.groups.length) * u}" height="${15 * u}" rx="${4 * u}"/>${x.groups.map((gg, i) => `<circle cx="${lx + (21 + i * 11) * u}" cy="${ly - 4.5 * u}" r="${4.4 * u}" fill="${GROUPS[gg].c}"/>`).join('')}</g>`;
         continue;
       }
-      const rest = x.groups.slice(1); if (!rest.length) continue;
+      const rest = restGroups(x); if (!rest.length) continue;
       if (lvl < 2.2 && reg.a < 600) continue;   // 전국 보기에서 작은 지역은 생략
       const [lx, ly] = reg.l;
       rest.forEach((gg, i) => {

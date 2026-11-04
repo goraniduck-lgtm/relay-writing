@@ -51,6 +51,13 @@ function poster() {
   s += `<rect x="${mx}" y="${my}" width="${mw}" height="${mh.toFixed(1)}" rx="3" fill="#E7F1F5"/>`;
   s += `<g transform="translate(${mx},${my}) scale(${sc.toFixed(5)}) translate(${-FULL.x},${-FULL.y})">`;
   REGIONS.forEach(r => { const x = info[r.k]; s += `<path d="${r.d}" fill="${x ? `url(#pppg${x.first})` : '#FFFDF7'}" stroke="#A89E88" stroke-width="${(0.13 * u).toFixed(2)}" stroke-linejoin="round"/>`; });
+  /* 가장 많이 등록한 모둠이 다르면 오른쪽 절반 */
+  REGIONS.forEach(r => {
+    const x = info[r.k]; if (!x || x.most === x.first) return;
+    const mid = (r.b[0] + r.b[2]) / 2;
+    s += `<clipPath id="phc${r.k}"><rect x="${mid}" y="${r.b[1] - 2}" width="${r.b[2] - mid + 2}" height="${r.b[3] - r.b[1] + 4}"/></clipPath><clipPath id="phr${r.k}"><path d="${r.d}"/></clipPath>` +
+      `<path d="${r.d}" fill="url(#pppg${x.most})" clip-path="url(#phc${r.k})"/><line x1="${mid}" y1="${r.b[1] - 2}" x2="${mid}" y2="${r.b[3] + 2}" stroke="#fff" stroke-width="${(0.35 * u).toFixed(2)}" clip-path="url(#phr${r.k})"/>`;
+  });
   SIDO.forEach(sd => { s += `<path d="${sd.d}" fill="none" stroke="#3d382f" stroke-width="${(0.42 * u).toFixed(2)}" stroke-linejoin="round"/>`; });
   const b = ULL_BOX; s += `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="#8A9AA3" stroke-dasharray="${2 * u} ${1.5 * u}" stroke-width="${.25 * u}"/>` + T(b[0] + 2 * u, b[3] - 1.5 * u, (2.4 * u).toFixed(1), '울릉도·독도', ' fill="#5d6d75"');
   /* 시·도 이름 (작게) */
@@ -61,19 +68,20 @@ function poster() {
   /* 번호 표 */
   order.forEach(k => {
     const r = REG[k], x = info[k], [lx, ly] = r.l, rr = 2.5 * u, G = GROUPS[x.first];
-    s += `<circle cx="${lx}" cy="${ly}" r="${rr}" fill="${G.c}" stroke="#fff" stroke-width="${.35 * u}"/>` + T(lx, ly + 1.05 * u, (num[k] > 99 ? 2.2 : 2.9) * u, num[k], ` text-anchor="middle" font-weight="900" fill="${G.ink}"`);
-    x.groups.slice(1).forEach((g, i) => { s += `<circle cx="${lx + rr + (1.6 + i * 2.3) * u}" cy="${ly + 1.8 * u}" r="${1.05 * u}" fill="${GROUPS[g].c}" stroke="#fff" stroke-width="${.2 * u}"/>`; });
+    s += `<circle cx="${lx}" cy="${ly}" r="${rr}" fill="${G.c}" stroke="#fff" stroke-width="${.35 * u}"/>` + halfDisc(lx, ly, rr, x) + T(lx, ly + 1.05 * u, (num[k] > 99 ? 2.2 : 2.9) * u, num[k], ` text-anchor="middle" font-weight="900" fill="${G.ink}" stroke="${G.c}" stroke-width="${.5 * u}" paint-order="stroke"`);
+    restGroups(x).forEach((g, i) => { s += `<circle cx="${lx + rr + (1.6 + i * 2.3) * u}" cy="${ly + 1.8 * u}" r="${1.05 * u}" fill="${GROUPS[g].c}" stroke="#fff" stroke-width="${.2 * u}"/>`; });
     if (r.whole) s += `<circle cx="${lx}" cy="${ly}" r="${rr + .9 * u}" fill="none" stroke="${G.c}" stroke-width="${.35 * u}" stroke-dasharray="${.8 * u} ${.5 * u}"/>`;
   });
   s += `</g>`;
   /* 범례 (지도 왼쪽 위 바다) */
   let ly0 = my + 6;
-  s += `<rect x="${mx + 4}" y="${my + 3}" width="44" height="66" rx="2.5" fill="#fff" fill-opacity=".92" stroke="#C9DCE4" stroke-width=".4"/>`;
-  s += T(mx + 8, ly0 + 4, 3.6, '먼저 찾은 모둠 색', ' font-weight="800" fill="#2B2A26"');
+  s += `<rect x="${mx + 4}" y="${my + 3}" width="50" height="76" rx="2.5" fill="#fff" fill-opacity=".92" stroke="#C9DCE4" stroke-width=".4"/>`;
+  s += T(mx + 8, ly0 + 4, 3.6, '모둠 색', ' font-weight="800" fill="#2B2A26"');
   GNUMS.forEach((g, i) => { const y = ly0 + 8 + i * 6.2; s += `<rect x="${mx + 8}" y="${y}" width="7" height="4.6" rx="1" fill="url(#pppg${g})"/>` + T(mx + 17, y + 3.7, 3.5, `${g}모둠`, ' font-weight="700" fill="#2B2A26"'); });
   const ly1 = ly0 + 8 + 6 * 6.2 + 2;
   s += `<circle cx="${mx + 9.5}" cy="${ly1 + 1}" r="1.1" fill="#1D7FE0"/>` + T(mx + 13, ly1 + 2.2, 3, '함께 찾은 모둠', ' fill="#6B6558"');
   s += T(mx + 8, ly1 + 8, 3, '⭐ 우리 지역 · 번호 = 오른쪽 목록', ' fill="#6B6558"');
+  s += T(mx + 8, ly1 + 13, 3, '왼쪽 반: 먼저 찾은 모둠', ' fill="#6B6558"') + T(mx + 8, ly1 + 17.5, 3, '오른쪽 반: 가장 많이 찾은 모둠', ' fill="#6B6558"');
   /* 통계 띠 */
   const sy = my + mh + 8;
   s += statsBand(list, mx, sy, mw, 78);
@@ -134,7 +142,7 @@ function listCols(list, order, num, info, area) {
     }
     if (it.head) {
       const k = it.head, G = GROUPS[info[k].first], fs = 3.9 * f;
-      s += `<circle cx="${col.x + 2.6 * f}" cy="${y + 3.2 * f}" r="${2.5 * f}" fill="${G.c}"/>` + T(col.x + 2.6 * f, y + 4.25 * f, (num[k] > 99 ? 2.2 : 2.9) * f, num[k], ` text-anchor="middle" font-weight="900" fill="${G.ink}"`);
+      s += `<circle cx="${col.x + 2.6 * f}" cy="${y + 3.2 * f}" r="${2.5 * f}" fill="${G.c}"/>` + halfDisc(col.x + 2.6 * f, y + 3.2 * f, 2.5 * f, info[k]) + T(col.x + 2.6 * f, y + 4.25 * f, (num[k] > 99 ? 2.2 : 2.9) * f, num[k], ` text-anchor="middle" font-weight="900" fill="${G.ink}" stroke="${G.c}" stroke-width="${.5 * f}" paint-order="stroke"`);
       s += T(col.x + 6.5 * f, y + 4.5 * f, fs, fit(REG[k].label, fs, col.w - 30), ' font-weight="900" fill="#2B2A26"') + T(col.x + 7 * f + tw(fit(REG[k].label, fs, col.w - 30), fs), y + 4.5 * f, 2.8 * f, REG[k].whole ? '' : REG[k].sido.sh, ' fill="#8b8576"');
     } else {
       const c = it.c, C = CATS[c.c], G = GROUPS[c.g] || GROUPS[0], fs = 3.4 * f, x0 = col.x + 6.5 * f;
@@ -148,6 +156,12 @@ function listCols(list, order, num, info, area) {
     y += h;
   }
   return s;
+}
+
+/* 오른쪽 반원: 가장 많이 등록한 모둠 */
+function halfDisc(cx, cy, r, x) {
+  if (!x || x.most === x.first) return '';
+  return `<path d="M${cx},${cy - r}A${r},${r} 0 0 1 ${cx},${cy + r}Z" fill="${GROUPS[x.most].c}"/>`;
 }
 
 /* ---------- 쪽 나누기 ---------- */

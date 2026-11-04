@@ -170,16 +170,21 @@ function visibleCards(cards, cfg) {
     .filter(c => c && c.r && REG[c.r] && (!okOnly || c.st === 'ok'))
     .sort((a, b) => (a.ts || 0) - (b.ts || 0));
 }
-/* 지역마다 [처음 등록한 모둠, 참여한 모둠들(등록 순), 카드 수] */
+/* 지역마다 처음 등록한 모둠(first), 가장 많이 등록한 모둠(most), 참여한 모둠들(등록 순), 모둠별 장수(cnt)
+   가장 많이 등록한 모둠이 여럿이면 먼저 등록한 모둠 → 처음 등록한 모둠이 그중에 있으면 first === most (한 색) */
 function paintInfo(list) {
   const info = {};
   for (const c of list) {
-    const p = info[c.r] || (info[c.r] = { first: c.g, groups: [], n: 0 });
+    const p = info[c.r] || (info[c.r] = { first: c.g, groups: [], cnt: {}, n: 0 });
     if (!p.groups.includes(c.g)) p.groups.push(c.g);
+    p.cnt[c.g] = (p.cnt[c.g] || 0) + 1;
     p.n++;
   }
+  for (const p of Object.values(info)) p.most = p.groups.reduce((a, b) => (p.cnt[b] > p.cnt[a] ? b : a), p.groups[0]);
   return info;
 }
+/* 반씩 칠한 두 모둠을 뺀 나머지 모둠 (점으로 표시) */
+const restGroups = x => x.groups.filter(g => g !== x.first && g !== x.most);
 /* 채운 시·도 (시·도 안 어느 곳이든 카드가 있으면) */
 function filledSido(info) {
   const set = new Set();

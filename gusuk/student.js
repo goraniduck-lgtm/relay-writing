@@ -85,7 +85,7 @@ function refresh() {
   $('#sidorow').innerHTML = SIDO.map(s => `<button class="chip${S.sido === s.s ? ' on' : ''}" data-s="${s.s}">${esc(s.sh)}${filled.has(s.s) ? '<span class="f"></span>' : ''}</button>`).join('');
   $$('#sidorow [data-s]').forEach(b => b.onclick = () => pickSido(b.dataset.s));
   const counts = {}; allCards(S.cards).forEach(c => { counts[c.g] = (counts[c.g] || 0) + 1; });
-  $('#legend').innerHTML = GNUMS.map(g => `<span style="--gc:${GROUPS[g].c}"><i></i>${g}모둠 ${counts[g] || 0}</span>`).join('') + `<span class="muted" style="font-weight:600">먼저 찾은 모둠 색으로 칠하고, 다음 모둠은 점으로 표시해요</span>`;
+  $('#legend').innerHTML = GNUMS.map(g => `<span style="--gc:${GROUPS[g].c}"><i></i>${g}모둠 ${counts[g] || 0}</span>`).join('') + `<span class="muted" style="font-weight:600">왼쪽 절반은 먼저 찾은 모둠, 오른쪽 절반은 가장 많이 찾은 모둠 색이에요 · 다른 모둠은 점</span>`;
   renderSide();
 }
 
@@ -161,7 +161,7 @@ function sidoSec(s) {
   const sd = SIDO_BY[s], regs = regionsOf(s);
   const wk = 'S' + s;
   return `<div class="sec"><div class="rhead"><div class="t"><h2>${esc(sd.sn)}</h2><small>지역을 골라요 · 지도에서 눌러도 돼요</small></div><button class="btn small" id="back">전국</button></div>
-    <div class="reglist">${regs.map(r => { const x = S.info[r.k]; return `<button class="chip" data-pick="${r.k}" style="--gc:${x ? GROUPS[x.first].c : '#fff'}"><i></i>${esc(r.whole ? r.label : r.n)}${r.k === (S.cfg.home || '41590') ? ' ⭐' : ''}</button>`; }).join('')}</div>
+    <div class="reglist">${regs.map(r => { const x = S.info[r.k]; return `<button class="chip" data-pick="${r.k}" style="--gc:${x ? `linear-gradient(90deg,${GROUPS[x.first].c} 50%,${GROUPS[x.most].c} 50%)` : '#fff'}"><i></i>${esc(r.whole ? r.label : r.n)}${r.k === (S.cfg.home || '41590') ? ' ⭐' : ''}</button>`; }).join('')}</div>
     ${s === '36' ? '' : `<button class="chip" data-pick="${wk}" style="justify-self:start">🗺️ ${esc(sd.sn)} 전체로 쓰기</button><p class="muted" style="margin:0">여러 시·군이 함께 여는 축제나 ${esc(sd.sh)} 전체의 상징은 '전체'로 써요.</p>`}</div>`;
 }
 function regionSec(k) {
@@ -169,7 +169,7 @@ function regionSec(k) {
   const isHome = k === (S.cfg.home || '41590');
   const last = S.lastSrc[k];
   return `<div class="sec"><div class="rhead"><div class="t"><h2>${isHome ? '⭐ ' : ''}${esc(r.label)}</h2><small>${esc(r.full)}${isHome ? ' · 우리 지역' : ''}</small></div><button class="btn small" id="back">← ${r.whole ? '전국' : esc(r.sido.sh)}</button></div>
-    ${x ? `<div class="muted">처음 찾은 모둠: ${groupDot(x.first)} ${x.groups.length > 1 ? `· 함께 찾은 모둠: ${x.groups.slice(1).map(groupDot).join(' ')}` : ''}</div>` : `<div class="muted">아직 아무도 찾지 않았어요. 우리가 처음 찾아볼까요?</div>`}
+    ${x ? `<div class="muted">처음 찾은 모둠: ${groupDot(x.first)} · 가장 많이 찾은 모둠: ${groupDot(x.most)} ${x.cnt[x.most]}장${restGroups(x).length ? ` · 함께 찾은 모둠: ${restGroups(x).map(groupDot).join(' ')}` : ''}</div>${x.most !== x.first ? '' : x.groups.length > 1 ? `<div class="muted" style="font-size:13px">다른 모둠이 ${GROUPS[x.first].name}보다 카드를 더 많이 올리면 지도의 오른쪽 절반을 차지해요</div>` : ''}` : `<div class="muted">아직 아무도 찾지 않았어요. 우리가 처음 찾아볼까요?</div>`}
     <button class="btn primary big" id="write" ${S.cfg.lock ? 'disabled' : ''}>＋ 이 지역 카드 쓰기</button></div>
     <div class="sec"><h3>🔎 자료 찾기</h3><div class="links">
       <a class="lnk gs" data-src="gs" href="${LINKS.gs(k)}" target="_blank" rel="noopener"><span class="ic">🧭</span><span>대한민국 구석구석에서 찾기<small>한국관광공사 · '${esc(searchWord(k))}' 검색${last === 'gs' ? ' · 최근에 열어 봄' : ''}</small></span></a>

@@ -257,7 +257,8 @@ function renderLobby(room) {
   const here = SEATS.filter(k => room.seats && room.seats[k]);
   const n = deckLen(Math.max(2, here.length), per, setTotal(s));
   const lname = (GAME.lengths.find(l => l.per === per) || {}).name || '';
-  $('#lobbySet').textContent = `${s.name} · ${lname} ${n}장 · ${max}명 방`;
+  const cnt = here.length >= 2 ? `지금 ${here.length}명이면 ${n}장` : `${max}명이 모이면 ${deckLen(max, per, setTotal(s))}장`;
+  $('#lobbySet').textContent = `${s.name} · ${max}명 방 · ${lname} (${cnt})`;
   $('#players').innerHTML = SEATS.slice(0, max).map(k => {
     const has = room.seats && room.seats[k];
     if (!has) return `<div class="pl empty">기다리는 중…</div>`;

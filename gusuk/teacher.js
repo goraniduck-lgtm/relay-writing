@@ -1,6 +1,6 @@
 /* 구석구석 — 교사 화면 (카드 관리 · 통계 · 설정) */
 'use strict';
-const T = { cfg: {}, cards: {}, trash: {}, tab: ls.get('gusuk.ttab', 'cards'), f: { g: 'all', c: 'all', s: 'all', st: 'all', q: '' }, okOnly: false, showTrash: false, unsub: [] };
+const T = { cfg: {}, cards: {}, trash: {}, tab: ls.get('gusuk.ttab', 'cards'), f: { g: 'all', c: 'all', s: 'all', st: 'all', q: '', sort: ls.get('gusuk.tsort', 'new'), dup: false }, okOnly: false, showTrash: false, unsub: [] };
 const app = $('#app');
 const LOGO_T = `<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="#174F56"/><path d="M20 6l5 14-5 14-5-14z" fill="#fff"/><path d="M20 6l5 14h-10z" fill="#F2C12E"/></svg>`;
 
@@ -86,10 +86,30 @@ function draw(force) {
 }
 
 /* ---------- 카드 관리 ---------- */
+/* 같은 지역·같은 분류에 이름이 같거나 한쪽이 다른 쪽을 품으면 중복 의심 */
+function dupMap() {
+  const all = allCards(T.cards), out = {};
+  const by = {};
+  all.forEach(c => { (by[c.r + '|' + c.c] = by[c.r + '|' + c.c] || []).push(c); });
+  Object.values(by).forEach(list => {
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = normName(list[i].n), b = normName(list[j].n);
+      if (a && b && (a === b || (a.length >= 2 && b.includes(a)) || (b.length >= 2 && a.includes(b)))) {
+        (out[list[i].id] = out[list[i].id] || []).push(list[j]); (out[list[j].id] = out[list[j].id] || []).push(list[i]);
+      }
+    }
+  });
+  return out;
+}
 function filtered() {
-  const f = T.f, q = f.q.trim();
-  return allCards(T.cards).filter(c => (f.g === 'all' || String(c.g) === f.g) && (f.c === 'all' || c.c === f.c) && (f.s === 'all' || REG[c.r].s === f.s) && (f.st === 'all' || c.st === f.st)
-    && (!q || [c.n, c.w, c.h, regLabel(c.r), regFull(c.r)].join(' ').includes(q))).reverse();
+  const f = T.f, q = f.q.trim(), dups = f.dup ? dupMap() : null;
+  const rows = allCards(T.cards).filter(c => (f.g === 'all' || String(c.g) === f.g) && (f.c === 'all' || c.c === f.c) && (f.s === 'all' || REG[c.r].s === f.s) && (f.st === 'all' || c.st === f.st)
+    && (!q || [c.n, c.w, c.h, regLabel(c.r), regFull(c.r)].join(' ').includes(q)) && (!dups || dups[c.id]));
+  if (f.sort === 'old') return rows;                       // 오래된 순
+  if (f.sort === 'region') return rows.sort((a, b) =>      // 지역 이름순 → 같은 지역 안에서 분류 → 이름 → 시간
+    regLabel(a.r).localeCompare(regLabel(b.r), 'ko') || a.r.localeCompare(b.r) ||
+    CAT_KEYS.indexOf(a.c) - CAT_KEYS.indexOf(b.c) || normName(a.n).localeCompare(normName(b.n), 'ko') || (a.ts || 0) - (b.ts || 0));
+  return rows.reverse();                                   // 최신순
 }
 function drawCards() {
   const body = $('#body');
@@ -100,12 +120,16 @@ function drawCards() {
         <select id="fc"><option value="all">모든 분류</option>${CAT_KEYS.map(c => `<option value="${c}">${CATS[c].icon} ${CATS[c].name}</option>`).join('')}</select>
         <select id="fs"><option value="all">모든 시·도</option>${SIDO.map(s => `<option value="${s.s}">${s.sn}</option>`).join('')}</select>
         <input id="fq" type="search" placeholder="이름·내용 찾기">
+        <select id="fsort" aria-label="정렬"><option value="new">최신순</option><option value="old">오래된 순</option><option value="region">지역 이름순 (ㄱㄴㄷ)</option></select>
+        <label class="chip" id="fdupl" style="cursor:pointer"><input type="checkbox" id="fdup" style="display:none">중복 의심만 보기</label>
         <span class="sp" style="flex:1"></span>
         <button class="btn small okb" id="bulkok">보이는 '검토 중' 모두 확인 완료</button>
         <button class="btn small" id="trashbtn"></button>
       </div><div class="list" id="list"></div></div>`;
     [['fg', 'g'], ['fc', 'c'], ['fs', 's']].forEach(([id, k]) => { const el = $('#' + id); el.value = T.f[k]; el.onchange = () => { T.f[k] = el.value; drawCards(); }; });
     const fq = $('#fq'); fq.value = T.f.q; fq.oninput = () => { T.f.q = fq.value; drawCards(); };
+    const fs = $('#fsort'); fs.value = T.f.sort; fs.onchange = () => { T.f.sort = fs.value; ls.set('gusuk.tsort', fs.value); drawCards(); };
+    $('#fdup').onchange = e => { T.f.dup = e.target.checked; drawCards(); };
     $('#bulkok').onclick = bulkOk;
     $('#trashbtn').onclick = () => { T.showTrash = !T.showTrash; drawCards(); };
   }
@@ -117,16 +141,27 @@ function drawCards() {
   $('#trashbtn').textContent = T.showTrash ? '← 카드 목록' : `🗑️ 휴지통 ${tn}`;
   const list = $('#list');
   if (T.showTrash) { list.innerHTML = trashHtml(); bindTrash(); return; }
-  const rows = filtered();
-  list.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<p class="muted">조건에 맞는 카드가 없어요.</p>';
+  $('#fdupl').classList.toggle('on', T.f.dup);
+  const rows = filtered(), dups = dupMap();
+  const nd = Object.keys(dups).length;
+  $('#fdupl').lastChild.textContent = `중복 의심만 보기 ${nd}`;
+  let h = '', lastR = null;
+  rows.forEach(c => {
+    if (T.f.sort === 'region' && c.r !== lastR) {   // 지역이 바뀔 때마다 머리줄
+      lastR = c.r; const n = rows.filter(x => x.r === c.r).length;
+      h += `<div class="rhd">📍 <b>${esc(regLabel(c.r))}</b> <span class="muted">${esc(REG[c.r].sido.sn)} · ${n}장</span></div>`;
+    }
+    h += rowHtml(c, dups[c.id]);
+  });
+  list.innerHTML = rows.length ? h : `<p class="muted">${T.f.dup ? '중복 의심 카드가 없어요.' : '조건에 맞는 카드가 없어요.'}</p>`;
   list.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a, b.dataset.id));
 }
-function rowHtml(c) {
+function rowHtml(c, dup) {
   const G = GROUPS[c.g] || GROUPS[0];
   const src = c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.url.replace(/^https?:\/\//, '').slice(0, 50))}</a> ${isOfficial(c.url) ? '<span class="badge-off">공인 주소</span>' : '<span class="badge-un">주소 확인</span>'}` : '';
   return `<div class="trow" style="--gc:${G.c}">
     <div class="who"><span>${groupDot(c.g)} <b>${esc(G.name)}</b></span><span>📍 <b>${esc(regLabel(c.r))}</b> <small class="muted">${esc(REG[c.r].sido.sh)}</small></span><span class="muted">${fmtTime(c.ts)}${c.fx ? ' <span class="badge-fx">고쳐서 다시 올림</span>' : ''}${c.tch ? ' <span class="badge-fx">선생님 수정</span>' : ''}</span></div>
-    <div class="what"><div>${catTag(c.c)} <span class="nm">${esc(c.n)}</span> ${stTag(c.st)}</div><div>${esc(c.w)}</div>
+    <div class="what"><div>${catTag(c.c)} <span class="nm">${esc(c.n)}</span> ${stTag(c.st)}${dup ? ` <span class="badge-dup" title="${esc(dup.map(d => (GROUPS[d.g] || GROUPS[0]).name + ' · ' + d.n).join(', '))}">중복 의심 · ${esc(dup.map(d => (GROUPS[d.g] || GROUPS[0]).name).join(', '))}</span>` : ''}</div><div>${esc(c.w)}</div>
       <div class="meta">방법: ${esc(labs(METHODS, c.m))}${c.h ? ' · ' + esc(c.h) : ''}${c.t ? ' · 특성: ' + esc(labs(TRAITS, c.t)) : ''}<br>출처: ${esc(lab(SOURCES, c.src))} ${src}</div>
       ${c.memo && c.st === 'fix' ? `<div class="memo">✏️ 요청: ${esc(c.memo)}</div>` : ''}</div>
     <div class="acts">${c.st !== 'ok' ? `<button class="btn small okb" data-a="ok" data-id="${c.id}">✔ 확인</button>` : `<button class="btn small" data-a="rv" data-id="${c.id}">확인 취소</button>`}

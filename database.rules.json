@@ -547,6 +547,85 @@
           }
         }
       }
+    },
+    "animation": {
+      ".read": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+      ".write": "(auth != null && auth.uid === 'VNW0t5e67CfInsF63jATWdBsaqG2')",
+      "subs": {
+        "$cid": {
+          "$sid": {
+            ".read": "auth != null && data.child('uid').val() === auth.uid",
+            ".write": "auth != null && !data.exists() && root.child('classes/' + $cid + '/name').exists() && newData.child('uid').val() === auth.uid && newData.child('done').val() === false && newData.child('ts').val() === now",
+            ".validate": "newData.hasChildren(['uid','no','name','title','frames','fps','w','h','bytes','parts','ts','done'])",
+            "uid": {
+              ".validate": "newData.isString()"
+            },
+            "no": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 60"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "title": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "frames": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 120"
+            },
+            "fps": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 15"
+            },
+            "w": {
+              ".validate": "newData.isNumber() && newData.val() >= 16 && newData.val() <= 1920"
+            },
+            "h": {
+              ".validate": "newData.isNumber() && newData.val() >= 16 && newData.val() <= 1080"
+            },
+            "bytes": {
+              ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 16000000"
+            },
+            "parts": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 40"
+            },
+            "ts": {
+              ".validate": "newData.isNumber()"
+            },
+            "done": {
+              ".write": "auth != null && data.parent().child('uid').val() === auth.uid && data.val() === false && newData.val() === true",
+              ".validate": "newData.isBoolean()"
+            },
+            "th": {
+              "$i": {
+                ".validate": "$i.matches(/^([0-9]|1[01])$/) && newData.isString() && newData.val().length <= 30000 && newData.val().beginsWith('data:image/jpeg;base64,')"
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      },
+      "files": {
+        "$sid": {
+          ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && root.child('animation/subs/' + newData.child('cid').val() + '/' + $sid).child('uid').val() === auth.uid && root.child('animation/subs/' + newData.child('cid').val() + '/' + $sid).child('done').val() === false",
+          ".validate": "newData.hasChildren(['uid','cid','p'])",
+          "uid": {
+            ".validate": "newData.isString()"
+          },
+          "cid": {
+            ".validate": "newData.isString()"
+          },
+          "p": {
+            "$i": {
+              ".write": "auth != null && !data.exists() && root.child('animation/files/' + $sid + '/uid').val() === auth.uid && root.child('animation/subs/' + root.child('animation/files/' + $sid + '/cid').val() + '/' + $sid).child('done').val() === false",
+              ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length <= 500000"
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
     }
   }
 }

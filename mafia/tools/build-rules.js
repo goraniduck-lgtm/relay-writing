@@ -187,7 +187,8 @@ const rules = {
     auction: require('../../auction/tools/rules.js'),   // 자리 경매
     scanimation: require('../../scanimation/tools/rules.js'),   // 움직이는 그림 공방
     gusuk: require('../../gusuk/tools/rules.js'),   // 구석구석 다 함께 찾아요
-    dobble: require('../../dobble/tools/rules.js')   // 딱! 같은 그림
+    dobble: require('../../dobble/tools/rules.js'),   // 딱! 같은 그림
+    animation: require('../../animation/tools/rules.js')   // 애니메이션 공방
   }
 };
 

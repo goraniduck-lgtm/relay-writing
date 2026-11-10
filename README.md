@@ -89,3 +89,16 @@
 - 판정: `dobble/rooms/{번호}/claims/{판}` 에 먼저 쓴 자리만 받음(트랜잭션 + 보안 규칙). 점수·카드는 이 기록만으로 두 태블릿이 똑같이 계산
 - 보안 규칙: `dobble/tools/rules.js` → `node mafia/tools/build-rules.js` 로 합침
 - 시험: `node dobble/tools/test-deck.js`(카드 규칙) · `node dobble/tools/test-rules.js`(보안 규칙) · `node dobble/tools/test-play.js`(정적 서버를 띄운 뒤, 두 태블릿 동시 대결) · `node dobble/tools/test-multi.js 주소 4`(여러 명)
+
+## 애니메이션 공방 (`animation/`)
+
+- 학생 태블릿: `https://goraniduck-lgtm.github.io/relay-writing/animation/` (그리기 → 움직임 보기 → 선생님께 보내기)
+  - 16:9(960×540) 그리기, 장면 최대 120장, 이전(빨강)·다음(파랑) 장면 흐리게 보기
+  - 장면 추가·복사·한 칸 이동, '여러 장면 고르기'로 여러 장 맨 앞/맨 뒤/한 칸 이동·복사·지우기(지우기는 '되돌리기' 가능)
+  - 빠르기 1~15장/초, 반복·왕복·한 번 재생. 그림은 태블릿 IndexedDB에 자동 저장(새로고침해도 이어서)
+  - 메모리 아끼기: 장면은 PNG Blob으로만 보관, 지금 장면만 큰 캔버스, 실행 취소는 지금 장면 15번
+- 교사 받은 함: `.../animation/teacher.html` — 카드 미리보기(실제 빠르기), 크게 보기·차례로 보기(교실 TV), GIF 받기, ZIP 모아 받기, 지우기
+- 보내는 파일: GIF 640×360 (색 256개 공통 팔레트, 같은 그림이 이어지면 한 장으로 합침). 120장면 촘촘한 그림도 약 3MB
+- 데이터: `animation/subs/{반}/{제출}`, `animation/files/{제출}` (GIF base64 조각) — 규칙 `animation/tools/rules.js`, 시험 `node animation/tools/test-rules.js`
+- 도구: `animation/vendor/gifenc.js`(gifenc 1.0.3, MIT), `animation/vendor/fflate.min.js`(fflate 0.8.2, MIT)
+- 움직이는 그림 공방: 실행 취소 기록을 모든 장면 합쳐 20개로 제한(태블릿 메모리 보호)

@@ -24,6 +24,7 @@ const SETS = [
   {
     id: 'basic',
     name: '기본 그림',
+    locked: true,          // 잠금: 방 만들기에서 고를 수 없음 (풀려면 이 줄을 지우기)
     desc: '그림 57개 · 카드 한 장에 8개',
     show: 'emoji',
     symbols: [

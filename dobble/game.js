@@ -103,9 +103,12 @@ document.addEventListener('click', e => {
 function renderMake() {
   $('#makeTitle').textContent = make.mode === 'solo' ? '혼자 연습' : '방 만들기';
   $('#makeGo').textContent = make.mode === 'solo' ? '시작!' : '방 만들기';
-  if (!SETS.some(s => s.id === make.set)) make.set = SETS[0].id;
+  const open = SETS.filter(s => !s.locked);
+  if (!open.some(s => s.id === make.set)) make.set = (open[0] || SETS[0]).id;
   $('#sets').innerHTML = SETS.map(s => {
-    const pv = s.symbols.slice(0, 8).map(x => x.img ? `<img src="${esc(x.img)}" alt="">` : esc(s.show === 'word' ? x.w : (emojiOf(x) || x.w))).join(s.show === 'word' ? ' · ' : '');
+    const pics = s.show === 'word' ? s.symbols : s.symbols.filter(x => x.img || emojiOf(x));
+    const pv = (pics.length ? pics : s.symbols).slice(0, 8).map(x => x.img ? `<img src="${esc(x.img)}" alt="">` : esc(s.show === 'word' ? x.w : (emojiOf(x) || x.w))).join(s.show === 'word' ? ' · ' : '');
+    if (s.locked) return `<button class="set locked" disabled aria-disabled="true"><b>🔒 ${esc(s.name)}</b><span class="pv">${pv}</span><small>지금은 잠겨 있어요</small></button>`;
     return `<button class="set${s.id === make.set ? ' on' : ''}" data-set="${esc(s.id)}"><b>${esc(s.name)}</b><span class="pv">${pv}</span><small>${esc(s.desc || '')}</small></button>`;
   }).join('');
   const total = setTotal(setById(make.set)), solo = make.mode === 'solo', k = solo ? 1 : make.max;
@@ -118,7 +121,7 @@ function renderMake() {
   }).join('');
 }
 $('#maxes').addEventListener('click', e => { const b = e.target.closest('[data-max]'); if (!b) return; make.max = +b.dataset.max; ls.set('dobble.max', make.max); renderMake(); });
-$('#sets').addEventListener('click', e => { const b = e.target.closest('[data-set]'); if (!b) return; make.set = b.dataset.set; ls.set('dobble.set', make.set); renderMake(); });
+$('#sets').addEventListener('click', e => { const b = e.target.closest('[data-set]'); if (!b || setById(b.dataset.set).locked) return; make.set = b.dataset.set; ls.set('dobble.set', make.set); renderMake(); });
 $('#lengths').addEventListener('click', e => { const b = e.target.closest('[data-len]'); if (!b) return; make.per = +b.dataset.len; ls.set('dobble.per', make.per); renderMake(); });
 $('#makeGo').addEventListener('click', () => { fsAuto(); if (make.mode === 'solo') startSolo(); else createRoom(); });
 $('#sets').addEventListener('click', () => preloadSet(setById(make.set)));

@@ -37,6 +37,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   /* 방 만들기 · 들어가기 */
   await A.fill('#nick', '번개손');
   await A.click('[data-go="make-duo"]');
+  ok('기본 그림 세트는 잠겨 있음', await A.$eval('#sets .set.locked', b => b.disabled && b.textContent.includes('잠겨')));
+  ok('잠긴 세트 대신 다른 세트가 골라져 있음', await A.evaluate(() => make.set !== 'basic' && !!document.querySelector('#sets .set.on')));
+  await A.evaluate(() => document.querySelector('#sets .set.locked').click());
+  ok('잠긴 세트를 눌러도 안 골라짐', await A.evaluate(() => make.set !== 'basic'));
   await A.click('[data-len="6"]');
   await shot(A, '1-make');
   await A.click('#makeGo');
@@ -248,7 +252,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await shot(S, '9-solo-result');
 
   /* 세로 화면 */
-  await A.click('[data-go="make-solo"]'); await A.click('[data-set="basic"]'); await A.click('#makeGo');
+  await A.click('[data-go="make-solo"]'); await A.click('[data-set="sci-ecosystem"]'); await A.click('#makeGo');
   await A.waitForFunction(() => G.playing, null, { timeout: 8000 });
   await A.setViewportSize({ width: 800, height: 1280 });
   await sleep(300);

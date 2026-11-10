@@ -345,6 +345,7 @@ function startSolo() {
 }
 function stopGame() {
   G.gen++; G.playing = false; G.busy = false; G.pending = null; G.locked = false;
+  G.syncing = false;   /* 이전 판의 진행 반영이 아직 돌던 중이어도 새 판은 처음부터 (예전엔 여기서 멈춰 '아깝다'만 뜸) */
   cancelPress(); clearInterval(G.clock); FX.clearAll(); $('#fly').innerHTML = '';
   $('#result').hidden = true; $('#countOver').hidden = true; $('#ask').hidden = true;
 }

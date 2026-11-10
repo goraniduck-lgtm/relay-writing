@@ -6,7 +6,7 @@
 <title>출처 모음 · 딱! 같은 그림</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 <style>
 body{-webkit-user-select:text;user-select:text}
 .page{max-width:1000px;margin:0 auto;padding:22px 18px 60px}
@@ -67,13 +67,18 @@ section > h3{color:var(--ink);font-size:24px;margin:0 0 10px}
 
   <div id="sets"></div>
 
+  <section id="ownSec" hidden>
+    <h3>직접 만든 그림 세트</h3>
+    <div class="links" id="ownSets"></div>
+  </section>
+
   <section>
     <h3>이모지 그림 세트</h3>
     <p class="note" id="emojiNote"></p>
   </section>
 </div>
 
-<script src="sets.js?v=5"></script>
+<script src="sets.js?v=6"></script>
 <script src="sets-region.js?v=3"></script>
 <script>
 'use strict';
@@ -133,6 +138,11 @@ credited.forEach((set, si) => {
   });
   draw();
 });
+const own = SETS.filter(s => s.credit);
+if (own.length) {
+  document.getElementById('ownSec').hidden = false;
+  document.getElementById('ownSets').innerHTML = own.map(s => `<div class="lk"><span class="ic">🎨</span><span><b>${esc(s.name)}</b><small>${esc(s.credit)} · ${s.symbols.length}개</small></span></div>`).join('');
+}
 const emojiSets = SETS.filter(s => !s.symbols.some(x => x.img)).map(s => s.name);
 document.getElementById('emojiNote').textContent = `${emojiSets.join(', ')} 세트는 따로 그림 파일 없이, 태블릿에 들어 있는 이모지 글꼴로 그림을 보여 줘요.`;
 </script>

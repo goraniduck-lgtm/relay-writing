@@ -56,33 +56,35 @@ const SETS = [
   {
     id: 'sci-ecosystem',
     name: '과학 4-2 생태계',
-    desc: '생산자·소비자·분해자·비생물 57개 · 카드 한 장에 8개',
+    desc: '생산자 14 · 소비자 20 · 분해자 10 · 비생물 요소 13 · 카드 한 장에 8개',
     show: 'both',
+    credit: '선생님이 ChatGPT(그림 생성)로 만든 그림',
     symbols: [
-      /* 생산자 */
-      { e: '🌾', w: '벼', m: 'heavy' }, { e: '🌳', w: '나무', m: 'heavy' }, { e: '🌲', w: '소나무', m: 'heavy' },
-      { e: '🌽', w: '옥수수', m: 'heavy' }, { e: '🌻', w: '해바라기', m: 'light' }, { e: '🌵', w: '선인장', m: 'hard' },
-      { e: '🍁', w: '단풍잎', m: 'light' }, { e: '🍀', w: '클로버', m: 'light' }, { e: '🌱', w: '새싹', m: 'light' },
-      { e: '🌿', w: '풀', m: 'light' }, { w: '이끼', m: 'jelly' },
-      /* 소비자 */
-      { e: '🐰', w: '토끼', m: 'jelly' }, { e: '🦗', w: '메뚜기', m: 'light' }, { e: '🐸', w: '개구리', m: 'jelly' },
-      { e: '🐍', w: '뱀', m: 'jelly' }, { e: '🦅', w: '매', m: 'light' }, { e: '🐿️', w: '다람쥐', m: 'jelly' },
-      { e: '🦌', w: '사슴', m: 'heavy' }, { e: '🦊', w: '여우', m: 'hard' }, { e: '🐺', w: '늑대', m: 'hard' },
-      { e: '🐻', w: '곰', m: 'heavy' }, { e: '🦉', w: '올빼미', m: 'hard' }, { e: '🐦', w: '참새', m: 'light' },
-      { e: '🦋', w: '나비', m: 'light' }, { e: '🐝', w: '벌', m: 'light' }, { e: '🐞', w: '무당벌레', m: 'light' },
-      { e: '🕷️', w: '거미', m: 'hard' }, { e: '🐜', w: '개미', m: 'hard' }, { e: '🐭', w: '쥐', m: 'jelly' },
-      { e: '🦝', w: '너구리', m: 'jelly' }, { e: '🐗', w: '멧돼지', m: 'heavy' }, { e: '🦆', w: '오리', m: 'jelly' },
-      { e: '🐟', w: '물고기', m: 'jelly' }, { e: '🐛', w: '애벌레', m: 'jelly' }, { e: '🐌', w: '달팽이', m: 'jelly' },
-      { e: '🐯', w: '호랑이', m: 'heavy' }, { e: '🦁', w: '사자', m: 'heavy' }, { e: '🦓', w: '얼룩말', m: 'heavy' },
-      { e: '🐳', w: '고래', m: 'heavy' }, { e: '🦈', w: '상어', m: 'hard' }, { e: '🦀', w: '게', m: 'hard' },
-      { e: '🦐', w: '새우', m: 'jelly' }, { e: '🐢', w: '거북', m: 'heavy' }, { w: '잠자리', m: 'light' },
-      /* 분해자 */
-      { e: '🍄', w: '버섯', m: 'jelly' }, { w: '곰팡이', m: 'light' }, { w: '세균', m: 'light' },
-      { e: '🪱', w: '지렁이', m: 'jelly' },
-      /* 비생물 요소 */
-      { e: '☀️', w: '햇빛', m: 'hard' }, { e: '💧', w: '물', m: 'jelly' }, { e: '🌬️', w: '공기', m: 'light' },
-      { w: '흙', m: 'heavy' }, { e: '🪨', w: '돌', m: 'heavy' }, { e: '🌡️', w: '온도', m: 'hard' },
-      { e: '🌧️', w: '비', m: 'jelly' }, { e: '❄️', w: '눈', m: 'light' }, { e: '☁️', w: '구름', m: 'light' }
+      /* 생산자 14 */
+      { img: 'img/sci/sci-01.webp', w: '벼', m: 'light' }, { img: 'img/sci/sci-02.webp', w: '나무', m: 'heavy' }, { img: 'img/sci/sci-03.webp', w: '소나무', m: 'heavy' },
+      { img: 'img/sci/sci-04.webp', w: '옥수수', m: 'heavy' }, { img: 'img/sci/sci-05.webp', w: '해바라기', m: 'light' }, { img: 'img/sci/sci-06.webp', w: '선인장', m: 'hard' },
+      { img: 'img/sci/sci-07.webp', w: '단풍잎', m: 'light' }, { img: 'img/sci/sci-08.webp', w: '클로버', m: 'light' }, { img: 'img/sci/sci-09.webp', w: '새싹', m: 'light' },
+      { img: 'img/sci/sci-10.webp', w: '풀', m: 'light' }, { img: 'img/sci/sci-11.webp', w: '이끼', m: 'jelly' }, { img: 'img/sci/sci-12.webp', w: '장미', m: 'hard' },
+      { img: 'img/sci/sci-13.webp', w: '벚꽃', m: 'light' }, { img: 'img/sci/sci-14.webp', w: '수초', m: 'jelly' },
+      /* 소비자 20 */
+      { img: 'img/sci/sci-15.webp', w: '토끼', m: 'jelly' }, { img: 'img/sci/sci-16.webp', w: '메뚜기', m: 'light' }, { img: 'img/sci/sci-17.webp', w: '개구리', m: 'jelly' },
+      { img: 'img/sci/sci-18.webp', w: '뱀', m: 'jelly' }, { img: 'img/sci/sci-19.webp', w: '매', m: 'light' }, { img: 'img/sci/sci-20.webp', w: '다람쥐', m: 'jelly' },
+      { img: 'img/sci/sci-21.webp', w: '사슴', m: 'heavy' }, { img: 'img/sci/sci-22.webp', w: '여우', m: 'hard' }, { img: 'img/sci/sci-23.webp', w: '올빼미', m: 'hard' },
+      { img: 'img/sci/sci-24.webp', w: '참새', m: 'light' }, { img: 'img/sci/sci-25.webp', w: '나비', m: 'light' }, { img: 'img/sci/sci-26.webp', w: '벌', m: 'light' },
+      { img: 'img/sci/sci-27.webp', w: '무당벌레', m: 'light' }, { img: 'img/sci/sci-28.webp', w: '거미', m: 'hard' }, { img: 'img/sci/sci-29.webp', w: '개미', m: 'hard' },
+      { img: 'img/sci/sci-30.webp', w: '물고기', m: 'jelly' }, { img: 'img/sci/sci-31.webp', w: '애벌레', m: 'jelly' }, { img: 'img/sci/sci-32.webp', w: '달팽이', m: 'jelly' },
+      { img: 'img/sci/sci-33.webp', w: '거북', m: 'heavy' }, { img: 'img/sci/sci-34.webp', w: '잠자리', m: 'light' },
+      /* 분해자 10 */
+      { img: 'img/sci/sci-35.webp', w: '버섯', m: 'jelly' }, { img: 'img/sci/sci-36.webp', w: '표고버섯', m: 'jelly' }, { img: 'img/sci/sci-37.webp', w: '푸른곰팡이', m: 'jelly' },
+      { img: 'img/sci/sci-38.webp', w: '빵곰팡이', m: 'jelly' }, { img: 'img/sci/sci-39.webp', w: '세균', m: 'light' }, { img: 'img/sci/sci-40.webp', w: '지렁이', m: 'jelly' },
+      { img: 'img/sci/sci-41.webp', w: '노래기', m: 'hard' }, { img: 'img/sci/sci-42.webp', w: '쥐며느리', m: 'hard' }, { img: 'img/sci/sci-43.webp', w: '쇠똥구리', m: 'hard' },
+      { img: 'img/sci/sci-44.webp', w: '송장벌레', m: 'hard' },
+      /* 비생물 요소 13 */
+      { img: 'img/sci/sci-45.webp', w: '햇빛', m: 'hard' }, { img: 'img/sci/sci-46.webp', w: '물', m: 'jelly' }, { img: 'img/sci/sci-47.webp', w: '공기', m: 'light' },
+      { img: 'img/sci/sci-48.webp', w: '흙', m: 'heavy' }, { img: 'img/sci/sci-49.webp', w: '돌', m: 'heavy' }, { img: 'img/sci/sci-50.webp', w: '온도', m: 'hard' },
+      { img: 'img/sci/sci-51.webp', w: '비', m: 'jelly' }, { img: 'img/sci/sci-52.webp', w: '눈', m: 'light' }, { img: 'img/sci/sci-53.webp', w: '구름', m: 'light' },
+      { img: 'img/sci/sci-54.webp', w: '모래', m: 'light' }, { img: 'img/sci/sci-55.webp', w: '얼음', m: 'hard' }, { img: 'img/sci/sci-56.webp', w: '바닷물', m: 'jelly' },
+      { img: 'img/sci/sci-57.webp', w: '바람', m: 'light' }
     ]
   }
 ];

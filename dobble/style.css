@@ -202,3 +202,9 @@ h3{font-size:20px;margin:18px 0 10px;color:var(--soft)}
 .rscore .rk{display:block;font-size:15px;color:var(--soft);font-family:system-ui}
 .rscore.many div b{font-size:34px}
 .mine.watch .card.me{opacity:.25}
+
+/* 상대의 작은 카드에서는 그림 이름을 숨김 (그림만) */
+.mini .sy .w{display:none}
+.mini .sy.word .w{display:block;font-size:6px}
+.mini .sy.both .e{font-size:calc(var(--d) * var(--sz) * .78)}
+.mini .sy.both.pic img{width:92%;height:92%}

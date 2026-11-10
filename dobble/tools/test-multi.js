@@ -16,8 +16,7 @@ const SEATS = 'abcdef';
 (async () => {
   const browser = await pw.chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const server = {};
-  await ctx.exposeFunction('__serverClaim', (p, v) => { if (server[p]) return false; server[p] = v; return true; });
+  const srv = await require('./fake-server')(ctx);
   await ctx.addInitScript(fake);
   await ctx.addInitScript(() => { try { localStorage.setItem('dobble.fs', 'false'); } catch (e) {} });
   await ctx.route(/fonts\.googleapis|fonts\.gstatic|gstatic\.com\/firebasejs/, r => r.abort());
@@ -129,6 +128,13 @@ const SEATS = 'abcdef';
   const winsPerRound = {};
   for (const p of players) for (const l of await p.evaluate(() => __FAKE_LOG__)) if (l.ok) winsPerRound[l.path] = (winsPerRound[l.path] || 0) + 1;
   ok('한 판에 승자 하나', Object.values(winsPerRound).every(v => v === 1));
+  { /* 판마다: 이긴 자리 = 가장 빠른 기록 */
+    const room = srv.tree.dobble.rooms[code], cl = room.claims || {}, ps = room.cfg.players || 'ab';
+    const rs = Object.values(cl);
+    ok('모든 판에 확정 기록', rs.length > 0 && rs.every(c => c.win), JSON.stringify(cl).slice(0, 300));
+    ok('이긴 자리 = 가장 빨리 누른 자리', rs.every(c => { const t = Object.entries(c).filter(([k, v]) => k !== 'win' && ps.includes(k)); return t.every(([, v]) => v >= c[c.win]); }), JSON.stringify(cl).slice(0, 300));
+    ok('두 명 이상 맞힌 판이 있었음', rs.some(c => Object.keys(c).length >= 3), JSON.stringify(cl).slice(0, 200));
+  }
   for (const p of remain) await p.waitForSelector('#result:not([hidden])', { timeout: 8000 });
   const titles = await Promise.all(remain.map(p => p.textContent('#rTitle')));
   ok('결과에 순위', titles.some(t => /1등|이겼다/.test(t)), titles.join(' / '));
@@ -136,7 +142,6 @@ const SEATS = 'abcdef';
   await shot(A, `m${N}-5-result`);
 
   /* 다시 하기: 나간 사람 빼고 */
-  for (const k of Object.keys(server)) delete server[k];
   await P[1].click('#again');
   for (const p of remain) await p.waitForFunction(() => G.playing && G.shown === 0, null, { timeout: 10000 });
   const r2 = await st(A);
@@ -149,7 +154,7 @@ const SEATS = 'abcdef';
     else { await p.click('#quitBtn'); await p.click('#askBtns .ghost'); }
   }
   await sleep(800);
-  const tree = await A.evaluate(() => JSON.parse(localStorage.getItem('__fakedb_dobble__') || '{}'));
+  const tree = srv.tree;
   ok('모두 나가면 방이 지워짐', !(tree.dobble && tree.dobble.rooms && tree.dobble.rooms[code]));
 
   ok('페이지 오류 없음', errors.length === 0, errors.slice(0, 5).join('\n'));

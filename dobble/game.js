@@ -1,7 +1,10 @@
 /* 딱! 같은 그림 — 화면 흐름과 게임 진행
    2~6명: 방 만든 사람이 인원을 고르고, 들어온 순서대로 a~f 자리에 앉음. 시작할 때 있는 사람이 참가자(cfg.players)
-   대결 판정: rooms/{번호}/claims/{판} 에 먼저 쓴 자리가 그 판을 가짐 (서버가 하나만 받음)
-   점수·카드는 claims 만으로 모든 태블릿이 똑같이 계산함 */
+   대결 판정 (인터넷 빠르기와 상관없이 공정하게):
+     맞히면 claims/{판}/{자리} 에 '내 화면에 카드가 나온 뒤 누르기까지 걸린 시간(ms)'을 씀
+     어느 태블릿이든 그 판의 첫 기록을 보면 GAME.judgeWindowMs 만큼 더 기다렸다가, 모인 기록 중 가장 빠른 자리를
+     claims/{판}/win 에 씀 (서버가 처음 한 번만 받음). 모두 이 win 을 따름
+   점수·카드는 win 기록만으로 모든 태블릿이 똑같이 계산함 */
 'use strict';
 
 const G = {
@@ -251,6 +254,7 @@ function onRoom(room) {
   const key = room.cfg.seed + '/' + room.cfg.go;
   if (key !== G.key) { G.key = key; setupGame(room.cfg, normClaims(room.claims)); }
   else gotClaims(normClaims(room.claims));
+  judge(room.claims);
   renderOpps();
   $('#myName').textContent = seatName(G.seat);
 }
@@ -297,8 +301,39 @@ renderResume();
 /* ================= 게임 준비 ================= */
 function normClaims(obj) {
   const a = []; if (!obj) return a;
-  for (let i = 0; ; i++) { const v = obj[i]; if (!SEATS.includes(v)) break; a.push(v); }
+  for (let i = 0; ; i++) {
+    const v = obj[i], w = v && typeof v === 'object' ? v.win : v;
+    if (!SEATS.includes(w)) break; a.push(w);
+  }
   return a;
+}
+/* ---------- 판정 ---------- */
+const judgeT = {};   /* 판마다 확정 타이머 */
+function fastestOf(c) {
+  let best = null;
+  for (const k of G.players) { const v = c && c[k]; if (typeof v === 'number' && (best === null || v < c[best])) best = k; }
+  return best;
+}
+/* 방 기록이 바뀔 때마다: 아직 확정 안 된 판에 기록이 있으면 잠시 뒤 확정, 확정된 판이면 내 결과 알려 주기 */
+function judge(raw) {
+  if (G.mode !== 'duo' || !raw) return;
+  const P = G.pending;
+  if (P && raw[P.r] && raw[P.r].win) {
+    const c = raw[P.r], w = c.win;
+    P.gap = (typeof c[G.seat] === 'number' && typeof c[w] === 'number') ? c[G.seat] - c[w] : null;
+    P.decide(w === G.seat ? 'me' : 'lost');
+  }
+  for (const key of Object.keys(raw)) {
+    const r = +key, c = raw[key];
+    if (!c || typeof c !== 'object' || c.win || judgeT[G.key + '/' + r]) continue;
+    const gen = G.gen;
+    judgeT[G.key + '/' + r] = setTimeout(() => {
+      if (gen !== G.gen || !G.room || !G.room.claims) return;
+      const now = G.room.claims[r];
+      if (!now || now.win) return;
+      DB.decide(`${roomPath()}/claims/${r}`, fastestOf);
+    }, GAME.judgeWindowMs);
+  }
 }
 const centerCard = () => G.game.deck[G.start + G.shown];
 const remaining = () => G.game.deck.length - G.start - G.shown;
@@ -610,8 +645,10 @@ async function launch(s) {
     G.pending = P;
     if (G.mode === 'solo') P.decide('me');
     else {
-      DB.claim(`${roomPath()}/claims/${P.r}`, G.seat).then(c => P.decide(c ? 'me' : 'lost'));
-      setTimeout(() => P.decide('net'), 4000);
+      P.rt = Math.max(0, Math.round(performance.now() - G.roundStart));   /* 내 화면에서 카드가 나온 뒤 걸린 시간 */
+      DB.set(`${roomPath()}/claims/${P.r}/${G.seat}`, P.rt).catch(() => {});   /* 이미 확정된 판이면 거절됨 → win 을 보고 판단 */
+      if (G.room) judge(G.room.claims);
+      setTimeout(() => P.decide('net'), 6000);
     }
   }
 
@@ -637,10 +674,10 @@ async function launch(s) {
   if (!ok) { await bounce(fl, s, dx, dy, m); G.busy = false; G.readyAt = Math.max(G.readyAt, performance.now() + GAME.tapGapMs); return; }
 
   /* 판정이 아직이면 부딪힌 자세로 잠깐 멈춤 (히트스톱) */
-  const result = P.result || await Promise.race([P.decided, wait(1500).then(() => 'net')]);
+  const result = P.result || await Promise.race([P.decided, wait(4000).then(() => 'net')]);
   if (gen !== G.gen) { fl.remove(); return; }
   if (result === 'me') await hitWin(fl, s, tgt, dx, dy, m, power, P.r);
-  else await missRace(fl, s, result);
+  else await missRace(fl, s, result, P.gap);
   if (gen !== G.gen) return;
   G.pending = null; G.busy = false;
   G.readyAt = Math.max(G.readyAt, performance.now() + GAME.tapGapMs);
@@ -691,9 +728,10 @@ async function hitWin(fl, s, tgt, dx, dy, m, power, r) {
 }
 
 /* 맞혔지만 상대가 먼저 (또는 연결 문제) */
-async function missRace(fl, s, result) {
+async function missRace(fl, s, result, gap) {
   const [x, y] = center(fl);
-  FX.floatText(x, y - 20, result === 'net' ? '연결이 느려요' : '아깝다!', result === 'net' ? '#6E665A' : '#E24B4A');
+  const txt = result === 'net' ? '연결이 느려요' : (gap != null && gap >= 0 ? `아깝다! ${(Math.max(gap, 10) / 1000).toFixed(2)}초 차이` : '아깝다!');
+  FX.floatText(x, y - 20, txt, result === 'net' ? '#6E665A' : '#E24B4A');
   if (G.combo) setCombo(0);
   await done(fl.animate([{ opacity: 1 }, { transform: getComputedStyle(fl).transform + ' translateY(40px) rotate(60deg) scale(.6)', opacity: 0 }], { duration: 280, easing: 'ease-in' }));
   fl.remove(); s.classList.remove('gone');

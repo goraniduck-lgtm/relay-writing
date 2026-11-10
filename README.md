@@ -86,7 +86,7 @@
 - 전체화면: 방 만들기·들어가기·시작할 때 자동(처음 화면·게임 화면 버튼으로 끄고 켬). 게임 중 새로고침·닫기는 브라우저가 한 번 물어봄
 - 연속 터치 막기: 한 번 날린 뒤 0.3초, 새 카드가 나온 뒤 0.25초는 누르기를 받지 않음, 두 번째 손가락 무시, 버튼 연타 무시 (`feel.js` 에서 조절)
 - **손맛 조절**: `dobble/feel.js` — 재질(무거움·가벼움·말랑함·단단함), 콤보 불, 틀렸을 때 잠김 시간, 기기 성능
-- 판정: `dobble/rooms/{번호}/claims/{판}` 에 먼저 쓴 자리만 받음(트랜잭션 + 보안 규칙). 점수·카드는 이 기록만으로 두 태블릿이 똑같이 계산
+- 판정(인터넷 빠르기와 상관없이): 맞히면 `claims/{판}/{자리}` 에 '내 화면에 카드가 나온 뒤 걸린 시간(ms)'을 쓰고, 첫 기록을 본 태블릿이 0.6초(`feel.js` judgeWindowMs) 뒤 서버 최신 기록 중 가장 빠른 자리를 `claims/{판}/win` 으로 한 번만 확정(트랜잭션 + 보안 규칙). 점수·카드는 win 만으로 모든 태블릿이 똑같이 계산. 시험: `node dobble/tools/test-fair.js`(인터넷이 느린 쪽이 더 빨리 누르면 이기는지)
 - 보안 규칙: `dobble/tools/rules.js` → `node mafia/tools/build-rules.js` 로 합침
 - 시험: `node dobble/tools/test-deck.js`(카드 규칙) · `node dobble/tools/test-rules.js`(보안 규칙) · `node dobble/tools/test-play.js`(정적 서버를 띄운 뒤, 두 태블릿 동시 대결) · `node dobble/tools/test-multi.js 주소 4`(여러 명)
 

@@ -43,6 +43,16 @@ const DB = window.__FAKE_DB__ || (function () {
         ref(path).transaction(cur => (cur === null ? v : undefined), (err, committed) => res(!err && committed), false);
       });
     },
+    /* 판 확정: 서버의 최신 기록으로 계산해서 한 번만 씀 (기록이 늦게 와도 확정 전이면 포함) */
+    decide(path, pick) {
+      return new Promise(res => {
+        ref(path).transaction(cur => {
+          if (!cur || typeof cur !== 'object' || cur.win) return undefined;
+          const w = pick(cur); if (!w) return undefined;
+          return Object.assign({}, cur, { win: w });
+        }, (err, committed) => res(!err && committed), false);
+      });
+    },
     whileOnline(path, v) { const r = ref(path); r.onDisconnect().remove(); return r.set(v); },
     connected(cb) { ref('.info/connected').on('value', s => cb(!!s.val())); },
     TS: firebase.database.ServerValue.TIMESTAMP

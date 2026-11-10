@@ -8,7 +8,8 @@
        on/a~f        접속 중 표시 (그 자리 기기만)
        quit/a~f      게임 중에 나감 (그 자리 기기만) — 다른 화면에 '친구가 나갔어요'
        cfg           {set, n, per, max(2~6), seed, st:'wait'|'play', go, players('abc'…)} — 방 안 기기 모두 바꿀 수 있음 (시작·다시 하기)
-       claims/{판}   그 판을 가진 자리 'a'~'f' — 비어 있을 때, 자기 자리로만, 참가자일 때만, 시작 시각이 지난 뒤에만
+       claims/{판}/{자리}  그 판에서 맞힌 반응 시간(ms) — 자기 자리로만, 참가자일 때만, 시작 뒤, 확정 전에 한 번만
+       claims/{판}/win     그 판을 가진 자리 — 방 안 기기가 서버 최신 기록 중 가장 빠른 자리로 한 번만 확정 (반응 시간은 못 바꿈)
    방 지우기: 그 방의 자리 기기 누구나, 또는 12시간 지난 방은 누구나 (정리용) */
 const SEATS = ['a', 'b', 'c', 'd', 'e', 'f'];
 const and = (...a) => '(' + a.join(' && ') + ')';
@@ -65,11 +66,21 @@ module.exports = {
       claims: {
         '.write': and('auth != null', inRoom, '!newData.exists()'),
         $r: {
-          '.write': and('auth != null', '!data.exists()', "$r.matches(/^[0-9]{1,2}$/)",
-            "root.child('dobble/rooms/' + $c + '/seats/' + newData.val()).val() === auth.uid",
-            `${roomAt('cfg/st')}.val() === 'play'`, `${roomAt('cfg/go')}.val() <= now`,
-            `(!${roomAt('cfg/players')}.exists() ? (newData.val() === 'a' || newData.val() === 'b') : ${roomAt('cfg/players')}.val().contains(newData.val()))`),
-          '.validate': "newData.isString() && newData.val().matches(/^[a-f]$/)"
+          '.validate': "$r.matches(/^[0-9]{1,2}$/)",
+          /* 판 확정: 방 안 기기 누구나 한 번만. 판 기록 전체를 다시 쓰되 반응 시간은 그대로, win 만 더함 (win 자리의 기록이 있어야 함) */
+          '.write': and('auth != null', inRoom, 'data.exists()', "!data.child('win').exists()", "newData.child('win').exists()",
+            ...SEATS.map(k => `newData.child('${k}').val() === data.child('${k}').val()`)),
+          win: {
+            '.validate': "newData.isString() && newData.val().matches(/^[a-f]$/) && newData.parent().child(newData.val()).isNumber()"
+          },
+          /* 내 반응 시간(ms): 내 자리로만, 참가자일 때만, 시작 뒤에만, 아직 확정 전일 때 한 번만 */
+          $s: {
+            '.write': and('auth != null', '!data.exists()', "$s.matches(/^[a-f]$/)", ownSeat,
+              `${roomAt('cfg/st')}.val() === 'play'`, `${roomAt('cfg/go')}.val() <= now`,
+              "!data.parent().child('win').exists()",
+              `(!${roomAt('cfg/players')}.exists() ? ($s === 'a' || $s === 'b') : ${roomAt('cfg/players')}.val().contains($s))`),
+            '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 600000'
+          }
         }
       },
       $o: { '.validate': false }

@@ -15,8 +15,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await pw.chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: true });
-  const server = {};
-  await ctx.exposeFunction('__serverClaim', (p, v) => { if (server[p]) return false; server[p] = v; return true; });
+  const srv = await require('./fake-server')(ctx);
   await ctx.addInitScript(fake);
   await ctx.addInitScript(() => { try { if (localStorage.getItem('dobble.fs') == null) localStorage.setItem('dobble.fs', 'false'); } catch (e) {} });
   await ctx.route(/fonts\.googleapis|fonts\.gstatic|gstatic\.com\/firebasejs/, r => r.abort());
@@ -124,7 +123,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const winsPerRound = {};
   for (const l of log) if (l.ok) winsPerRound[l.path] = (winsPerRound[l.path] || 0) + 1;
   ok('한 판에 승자 하나', Object.values(winsPerRound).every(v => v === 1));
-  ok('동시 누름에서 진 쪽이 있음 (아깝다)', log.some(l => !l.ok), log.length);
+  { /* 판마다: 이긴 자리 = 가장 빠른 기록 */
+    const room = srv.tree.dobble.rooms[code], cl = room.claims || {}, ps = room.cfg.players || 'ab';
+    const rs = Object.values(cl);
+    ok('모든 판에 확정 기록', rs.length > 0 && rs.every(c => c.win), JSON.stringify(cl).slice(0, 300));
+    ok('이긴 자리 = 가장 빨리 누른 자리', rs.every(c => { const t = Object.entries(c).filter(([k, v]) => k !== 'win' && ps.includes(k)); return t.every(([, v]) => v >= c[c.win]); }), JSON.stringify(cl).slice(0, 300));
+    ok('두 명 이상 맞힌 판이 있었음', rs.some(c => Object.keys(c).length >= 3), JSON.stringify(cl).slice(0, 200));
+  }
   await Promise.all([A, B].map(p => p.waitForSelector('#result:not([hidden])')));
   const ta = await A.textContent('#rTitle'), tb = await B.textContent('#rTitle');
   ok('결과 문구', (fa.scores.a > fa.scores.b ? /이겼다/.test(ta) && /아깝다/.test(tb) : fa.scores.a < fa.scores.b ? /아깝다/.test(ta) && /이겼다/.test(tb) : /비겼다/.test(ta)), ta + ' / ' + tb);
@@ -132,7 +137,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   /* 다시 하기 */
   const seed0 = await A.evaluate(() => G.cfg.seed);
-  for (const k of Object.keys(server)) delete server[k];
   await B.click('#again');
   await Promise.all([A, B].map(p => p.waitForFunction(s => G.cfg.seed !== s && !G.ended, seed0, { timeout: 8000 })));
   ok('다시 하기: 두 태블릿 결과창 닫힘', await A.isHidden('#result') && await B.isHidden('#result'));
@@ -219,7 +223,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await B.click('#askBtns .primary');
   await B.waitForSelector('#home:not([hidden])');
   await sleep(400);
-  ok('둘 다 나가면 방 지워짐', await A.evaluate(c => !(JSON.parse(localStorage.getItem('__fakedb_dobble__') || '{}').dobble || { rooms: {} }).rooms?.[c], code));
+  ok('둘 다 나가면 방 지워짐', !(srv.tree.dobble && srv.tree.dobble.rooms && srv.tree.dobble.rooms[code]));
   ok('이어서 하기 안 보임', await A.isHidden('#resume') && await B.isHidden('#resume'));
 
   /* 혼자 연습 */

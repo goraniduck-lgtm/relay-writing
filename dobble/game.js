@@ -502,7 +502,7 @@ async function sync() {
     while (gen === G.gen && G.playing && !G.ended && G.shown < G.claims.length) {
       if (G.pending && G.pending.r === G.shown) break;
       const w = G.claims[G.shown];
-      if (w === G.seat) { applyRound(w); renderAll(); } else await oppTake(w);
+      if (w === G.seat) { advanceCard(w); } else oppTake(w);
     }
   } finally { if (gen === G.gen) G.syncing = false; }
   checkEnd();
@@ -511,73 +511,32 @@ function checkEnd() {
   if (G.playing && !G.ended && !G.pending && G.start + G.shown >= G.game.deck.length) finish();
 }
 
-/* 상대가 가져감: 가운데 카드가 상대 쪽으로 날아감 */
-async function oppTake(w) {
-  G.busy = true; cancelPress();
-  if (G.combo) setCombo(0);
-  const gen = G.gen;
-  await oppShot(w, gen);
-  if (gen !== G.gen) return;
-  const a = cC.getBoundingClientRect(), b = anchorOf(w).getBoundingClientRect();
-  const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2), sc = b.width / a.width;
-  FX.tone(500, .25, 'sine', .07, 160);
-  await done(cC.animate([{ transform: 'none' }, { transform: `translate(${dx * .5}px,${dy * .5 - 30}px) rotate(-14deg) scale(${(1 + sc) / 2})`, offset: .5 }, { transform: `translate(${dx}px,${dy}px) rotate(-30deg) scale(${sc})`, opacity: .6 }], { duration: 340, easing: 'cubic-bezier(.5,0,.7,1)' }));
-  if (gen !== G.gen) return;
-  applyRound(w);
-  renderAll(); renderCenter(true);
-  miniOf(w).animate([{ transform: 'scale(1)' }, { transform: sqz(1.3, .8) }, { transform: sqz(.9, 1.12) }, { transform: 'scale(1)' }], { duration: 280 });
-  const oe = oppEl(w); if (oe) oe.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 300 });
-  FX.tone(150, .14, 'sine', .2, 70);
-  FX.setOpp(oppStreak());
-  G.roundStart = performance.now();
-  G.busy = false;
+/* 카드 복사본만 날리고 실제 카드는 즉시 교체한다. */
+function collectCard(w) {
+  const target = w === G.seat ? cM : anchorOf(w);
+  const a = cC.getBoundingClientRect(), b = target.getBoundingClientRect();
+  const ghost = cC.cloneNode(true);
+  ghost.removeAttribute('id');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.style.cssText += `;position:fixed;pointer-events:none;margin:0;left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px;--d:${a.width}px`;
+  $('#fly').appendChild(ghost);
+  const dx = b.left + b.width / 2 - a.left - a.width / 2;
+  const dy = b.top + b.height / 2 - a.top - a.height / 2;
+  const anim = ghost.animate([{transform:'scale(.8)', opacity:.42}, {transform:`translate(${dx}px,${dy}px) scale(.24)`, opacity:0}], {duration:180, easing:'ease-out'});
+  done(anim).then(() => ghost.remove());
 }
-
-/* 상대가 맞힌 그림이 상대 카드에서 날아와 가운데 카드에 부딪힘 (상대 색으로) */
-async function oppShot(w, gen) {
-  const sid = commonOf(G.tops[w], centerCard());
-  const tgt = cC.querySelector(`.sy[data-s="${sid}"]`);
-  if (!tgt) return;
-  let from = miniOf(w).querySelector(`.sy[data-s="${sid}"]`);
-  if (from && !from.getBoundingClientRect().width) from = null;
-  const m = matOf(G.set, sid), color = GAME.colors[w];
-  const halo = `color-mix(in srgb, ${color} 30%, transparent)`;
-  const [tx, ty] = center(tgt), [sx, sy] = center(from || anchorOf(w));
-  const dx = tx - sx, dy = ty - sy;
-  const tw = tgt.getBoundingClientRect().width || 1;
-  const s0 = from ? Math.max(.12, from.getBoundingClientRect().width / tw) : .2;
-  const r1 = parseFloat(tgt.style.getPropertyValue('--r')) || 0, r0 = r1 - m.spin;
-  const fl = tgt.cloneNode(true);
-  fl.classList.remove('good', 'bad', 'hold', 'gone'); fl.classList.add('flyer', 'opp');
-  fl.style.cssText += `;left:${sx}px;top:${sy}px;--d:${cC.offsetWidth}px;transition:none;--halo:${halo}`;
-  $('#fly').appendChild(fl);
-  const dur = clamp(m.flight * .85, GAME.flightMin, GAME.flightMax), arc = m.arc * .6;
-  const frames = [0, .25, .5, .75, 1].map(t => {
-    const x = dx * t + (m.wave ? Math.sin(t * Math.PI * 2) * m.wave * .6 : 0), y = dy * t - arc * 4 * t * (1 - t);
-    const k = s0 + (1.1 - s0) * t + .15 * Math.sin(t * Math.PI);
-    return { transform: `translate(-50%,-50%) translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${(r0 + (r1 - r0) * t).toFixed(0)}deg) scale(${k.toFixed(3)})` };
-  });
-  FX.tone(m.whoosh[0], dur / 1000, 'sine', .06, m.whoosh[1]);
-  const anim = fl.animate(frames, { duration: dur, easing: 'cubic-bezier(.45,0,.95,.55)', fill: 'forwards' });
-  let flying = true;
-  (function trail() { if (!flying) return; const [x, y] = center(fl); FX.dot(x, y, m.trail * .8, color, 240); requestAnimationFrame(trail); })();
-  await done(anim);
-  flying = false; fl.remove();
-  if (gen !== G.gen) return;
-  /* 부딪힘 */
-  const imp = m.impact;
-  tgt.style.transition = 'none'; tgt.style.setProperty('--halo', halo);
-  { const [qx, qy] = S2(1 + .4 * imp, Math.max(.45, 1 - .3 * imp)); setv(tgt, { sx: qx.toFixed(2), sy: qy.toFixed(2) }); }
-  FX.tone(m.hit[0], .16, m.hit[1], m.hit[2] * .7, m.hit[3]);
-  FX.ring(tx, ty, color, 110 * Math.min(imp, 1.6), 300);
-  FX.burst(tx, ty, Math.round(8 * imp + 4), 70 * Math.min(imp, 1.4));
-  const n = Math.hypot(dx, dy) || 1, p = 7 * m.knock;
-  cC.animate([{ translate: '0 0', rotate: '0deg' }, { translate: `${(dx / n * p).toFixed(1)}px ${(dy / n * p).toFixed(1)}px`, rotate: `${dx > 0 ? 4 : -4}deg`, offset: .25 }, { translate: '0 0', rotate: '0deg' }], { duration: 320, easing: 'ease-out' });
-  FX.floatText(tx, ty - 34, `${seatName(w)} 먼저!`, color);
-  await wait(70);
-  if (gen !== G.gen) return;
-  tgt.style.transition = `transform ${m.spring[0]}ms ${m.spring[1]}`; setv(tgt, { sx: 1.25, sy: 1.25 });
-  await wait(180);
+function advanceCard(w) {
+  cancelPress();
+  collectCard(w);
+  applyRound(w);
+  renderAll();
+  G.roundStart = performance.now();
+}
+function oppTake(w) {
+  if (G.combo) setCombo(0);
+  advanceCard(w);
+  FX.tone(500, .15, 'sine', .07, 160);
+  FX.setOpp(oppStreak());
 }
 
 /* ================= 누르기 ================= */
@@ -592,7 +551,7 @@ cM.addEventListener('pointerdown', e => {
   if (!s || !G.playing || G.ended || G.busy || G.locked || G.pending || G.pressed) return;
   if (G.watch || !e.isPrimary || performance.now() < G.readyAt || !$('#ask').hidden) return;
   e.preventDefault();
-  G.pressed = s; G.pressId = e.pointerId;
+  G.pressed = s; G.pressId = e.pointerId; G.pressRound = G.shown;
   const sid = +s.dataset.s, m = matOf(G.set, sid);
   const sy0 = G.set.symbols[sid];
   $('#info').textContent = sy0.note ? `${symName(G.set, sid)} · ${sy0.note}` : `${symName(G.set, sid)} · ${m.name}`;
@@ -619,7 +578,7 @@ function cancelPress() {
   const s = G.pressed; G.pressed = null; relax();
   s.classList.remove('hold'); s.style.transition = ''; setv(s, { sx: 1, sy: 1 });
 }
-addEventListener('pointerup', e => { if (!G.pressed || e.pointerId !== G.pressId) return; const s = G.pressed; G.pressed = null; relax(); launch(s); });
+addEventListener('pointerup', e => { if (!G.pressed || e.pointerId !== G.pressId) return; const s = G.pressed; G.pressed = null; relax(); if (G.pressRound === G.shown && s.isConnected) launch(s); });
 addEventListener('pointercancel', e => { if (e.pointerId === G.pressId) cancelPress(); });
 
 /* ================= 날리기 ================= */
@@ -651,6 +610,25 @@ async function launch(s) {
       if (G.room) judge(G.room.claims);
       setTimeout(() => P.decide('net'), 6000);
     }
+    s.classList.add('good');
+    const result = P.result || await P.decided;
+    if (gen !== G.gen) return;
+    if (result === 'me') {
+      if (G.claims.length === P.r) G.claims.push(G.seat);
+      setCombo(G.combo + 1);
+      FX.tone(990, .16, 'triangle', .15);
+      advanceCard(G.seat);
+      FX.setOpp(0);
+    } else {
+      s.classList.remove('good');
+      if (G.combo) setCombo(0);
+      const [x,y] = center(s);
+      FX.floatText(x, y - 20, result === 'net' ? '연결이 느려요' : (P.gap >= 0 && P.gap != null ? `아깝다! ${(Math.max(P.gap,10)/1000).toFixed(2)}초 차이` : '아깝다!'));
+    }
+    G.pending = null;
+    G.busy = false;
+    sync(); checkEnd();
+    return;
   }
 
   const [sx, sy] = center(s), [tx, ty] = center(tgt || cC);
@@ -665,79 +643,10 @@ async function launch(s) {
   s.classList.remove('hold'); s.classList.add('gone'); s.style.transition = ''; setv(s, { sx: 1, sy: 1 });
   FX.tone(m.whoosh[0], dur / 1000, 'sine', .09, m.whoosh[1] * Math.sqrt(power));
   const anim = fl.animate(flightFrames(dx, dy, r0, r1, m, m.arc * J()), { duration: dur, easing: 'cubic-bezier(.45,0,.95,.55)', fill: 'forwards' });
-  let flying = true;
-  const color = G.combo >= FIRE.startCombo ? '#EF9F27' : '#7F77DD';
-  (function trail() { if (!flying) return; const [x, y] = center(fl); FX.dot(x, y, m.trail * (power > 1.2 ? 1.3 : 1), color, 260); requestAnimationFrame(trail); })();
   await done(anim);
-  flying = false;
-  if (gen !== G.gen) { fl.remove(); return; }
-
-  if (!ok) { await bounce(fl, s, dx, dy, m); G.busy = false; G.readyAt = Math.max(G.readyAt, performance.now() + GAME.tapGapMs); return; }
-
-  /* 판정이 아직이면 부딪힌 자세로 잠깐 멈춤 (히트스톱) */
-  const result = P.result || await Promise.race([P.decided, wait(4000).then(() => 'net')]);
-  if (gen !== G.gen) { fl.remove(); return; }
-  if (result === 'me') await hitWin(fl, s, tgt, dx, dy, m, power, P.r);
-  else await missRace(fl, s, result, P.gap);
-  if (gen !== G.gen) return;
-  G.pending = null; G.busy = false;
-  G.readyAt = Math.max(G.readyAt, performance.now() + GAME.tapGapMs);
-  sync(); checkEnd();
-}
-
-/* 내가 먼저! */
-async function hitWin(fl, s, tgt, dx, dy, m, power, r) {
-  const gen = G.gen;
-  if (G.mode === 'duo' && G.claims.length === r) G.claims.push(G.seat);
-  if (G.mode === 'solo') G.claims[r] = 'a';
-  setCombo(G.combo + 1);
-  const lvl = Math.min(G.combo, 5), k = 1 + lvl * .08, n = Math.hypot(dx, dy) || 1, imp = m.impact * power;
-  fl.remove();
-  tgt.style.transition = 'none'; tgt.classList.add('good');
-  { const [qx, qy] = S2(1 + .45 * imp, Math.max(.4, 1 - .35 * imp)); setv(tgt, { sx: qx.toFixed(2), sy: qy.toFixed(2) }); }
-  FX.tone(m.hit[0], .18, m.hit[1], m.hit[2], m.hit[3]); FX.tone(660 * k, .12, 'triangle', .16);
-  const [tx, ty] = center(tgt);
-  FX.ring(tx, ty, '#EF9F27', (100 + lvl * 20) * Math.min(imp, 1.8), 300);
-  await wait((60 + lvl * 10) * Math.min(imp, 1.6));
-  if (gen !== G.gen) return;
-  FX.tone(990 * k, .22, 'triangle', .15); if (lvl >= 3) FX.tone(1320 * k, .28, 'sine', .1);
-  const sp = `transform ${m.spring[0]}ms ${m.spring[1]}`;
-  tgt.style.transition = sp; setv(tgt, { sx: 1.35, sy: 1.35 });
-  s.classList.remove('gone'); s.classList.add('good'); s.style.transition = sp; setv(s, { sx: 1.35, sy: 1.35 });
-  FX.burst(tx, ty, Math.round((10 + lvl * 5) * imp), (70 + lvl * 15) * Math.min(imp, 1.5));
-  const p = (6 + lvl * 3) * m.knock * power;
-  cC.animate([{ translate: '0 0', rotate: '0deg' }, { translate: `${(dx / n * p).toFixed(1)}px ${(dy / n * p).toFixed(1)}px`, rotate: `${dx > 0 ? 5 : -5}deg`, offset: .2 }, { translate: `${(-dx / n * 3).toFixed(1)}px ${(-dy / n * 3).toFixed(1)}px`, rotate: `${dx > 0 ? -2 : 2}deg`, offset: .55 }, { translate: '0 0', rotate: '0deg' }], { duration: 420, easing: 'ease-out' });
-  const amp = (lvl >= 2 ? 2 + lvl * 1.5 : 0) + (imp > 1.6 ? 3 : 0);
-  if (amp > 0) FX.shake(table, amp, 260);
-  if (power >= 1.25) FX.floatText(tx, ty - 30, '빠르다!');
-  await wait(Math.max(320, m.spring[0] * .7));
-  if (gen !== G.gen) return;
-  /* 가운데 카드가 내 카드 위로 */
-  const a = cC.getBoundingClientRect(), b = cM.getBoundingClientRect();
-  const mx = b.left + b.width / 2 - (a.left + a.width / 2), my = b.top + b.height / 2 - (a.top + a.height / 2);
-  FX.tone(300, .2, 'sine', .07, 900);
-  await done(cC.animate([{ transform: 'none' }, { transform: `translate(${mx * .5}px,${my * .5 - 50}px) rotate(14deg) scale(1.05)`, offset: .5 }, { transform: `translate(${mx}px,${my}px) rotate(0deg) scale(1)` }], { duration: 360, easing: 'cubic-bezier(.5,0,.6,1)' }));
-  if (gen !== G.gen) return;
-  applyRound(G.seat);
-  renderAll(); renderCenter(true);
-  FX.tone(130, .18, 'sine', .35, 60);
-  cM.animate([{ transform: 'scale(1)' }, { transform: sqz(1.08, .9) }, { transform: sqz(.97, 1.04) }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
-  const [px, py] = center(cM);
-  FX.burst(px, py + cM.offsetHeight * .45, 8, 60);
-  FX.setOpp(0);
-  G.roundStart = performance.now();
-}
-
-/* 맞혔지만 상대가 먼저 (또는 연결 문제) */
-async function missRace(fl, s, result, gap) {
-  const [x, y] = center(fl);
-  const txt = result === 'net' ? '연결이 느려요' : (gap != null && gap >= 0 ? `아깝다! ${(Math.max(gap, 10) / 1000).toFixed(2)}초 차이` : '아깝다!');
-  FX.floatText(x, y - 20, txt, result === 'net' ? '#6E665A' : '#E24B4A');
-  if (G.combo) setCombo(0);
-  await done(fl.animate([{ opacity: 1 }, { transform: getComputedStyle(fl).transform + ' translateY(40px) rotate(60deg) scale(.6)', opacity: 0 }], { duration: 280, easing: 'ease-in' }));
-  fl.remove(); s.classList.remove('gone');
-  s.animate([{ scale: '.4', opacity: 0 }, { scale: '1', opacity: 1 }], { duration: 220, easing: 'ease-out' });
-  if (result === 'net') toast('인터넷 연결을 확인해 주세요');
+  if (gen !== G.gen || !s.isConnected) { fl.remove(); if (gen === G.gen) G.busy = false; return; }
+  await bounce(fl, s, dx, dy, m);
+  if (gen === G.gen) G.busy = false;
 }
 
 /* 틀림: 튕겨 돌아오고 잠깐 잠김 */
@@ -755,7 +664,8 @@ async function bounce(fl, s, dx, dy, m) {
     { transform: `translate(-50%,-50%) translate(${(dx * .45).toFixed(1)}px,${(dy * .45 - back).toFixed(1)}px) rotate(${-m.spin * .6}deg) scale(1)`, offset: .5 },
     { transform: `translate(-50%,-50%) rotate(${-m.spin}deg) scale(.95)` }
   ], { duration: bd, easing: 'cubic-bezier(.2,.7,.4,1)', fill: 'forwards' }));
-  fl.remove(); s.classList.remove('gone'); s.classList.add('bad');
+  fl.remove(); if (!s.isConnected) return;
+  s.classList.remove('gone'); s.classList.add('bad');
   s.animate([{ translate: '-12px 0' }, { translate: '9px 2px' }, { translate: '-6px -1px' }, { translate: '3px 0' }, { translate: '0 0' }], { duration: 340, easing: 'ease-out' });
   cM.animate([{ translate: '0 0', rotate: '0deg' }, { translate: '0 8px', rotate: '-4deg' }, { translate: '0 0', rotate: '0deg' }], { duration: 300, easing: 'ease-out' });
   G.locked = true; cM.classList.add('locked');
